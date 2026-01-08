@@ -81,6 +81,20 @@
       ],
     };
 
+    const COLORS = [
+      { id: 'all', name: 'All', color: null },
+      { id: 'red', name: 'Red', color: '#ef4444' },
+      { id: 'orange', name: 'Orange', color: '#f97316' },
+      { id: 'yellow', name: 'Yellow', color: '#eab308' },
+      { id: 'green', name: 'Green', color: '#22c55e' },
+      { id: 'blue', name: 'Blue', color: '#3b82f6' },
+      { id: 'purple', name: 'Purple', color: '#8b5cf6' },
+      { id: 'pink', name: 'Pink', color: '#ec4899' },
+      { id: 'gray', name: 'Gray', color: '#6b7280' },
+      { id: 'black', name: 'Black', color: '#1a1a2e' },
+      { id: 'white', name: 'White', color: '#ffffff' },
+    ];
+
     const DEFAULT_REFERENCES = [
       {
         id: 1,
@@ -139,12 +153,14 @@
       const [selectedTags, setSelectedTags] = useState([]);
       const [selectedRef, setSelectedRef] = useState(null);
       const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+      const [imageZoom, setImageZoom] = useState(null);
       const [newRef, setNewRef] = useState({
         type: 'website',
         title: '',
         url: '',
         thumbnail: '',
         category: 'landing',
+        color: 'all',
         tags: '',
         note: '',
       });
@@ -607,7 +623,12 @@ const copyToClipboard = async (text) => {
             <div style={styles.modalOverlay} onClick={() => setSelectedRef(null)}>
               <div style={styles.modal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
-                <img src={selectedRef.thumbnail} alt={selectedRef.title} style={styles.modalImage} />
+                <img 
+                  src={selectedRef.thumbnail} 
+                  alt={selectedRef.title} 
+                  style={styles.modalImage}
+                  onClick={() => setImageZoom(selectedRef.thumbnail)}
+                />
                 <div style={styles.modalContent}>
                   <div style={styles.modalMeta}>
                     <span style={styles.modalType}>
@@ -625,9 +646,11 @@ const copyToClipboard = async (text) => {
                     )}
                   </div>
                   <h2 style={styles.modalTitle}>{selectedRef.title}</h2>
-                  <a href={selectedRef.url} target="_blank" rel="noopener noreferrer" style={styles.modalUrl}>
-                    {selectedRef.url} ↗
-                  </a>
+                  {selectedRef.url && (
+                    <a href={selectedRef.url} target="_blank" rel="noopener noreferrer" style={styles.modalUrl}>
+                      {selectedRef.url} ↗
+                    </a>
+                  )}
                   {selectedRef.note && <p style={styles.modalNote}>{selectedRef.note}</p>}
                   <div style={styles.modalTags}>
                     {selectedRef.tags.map(tag => (
@@ -698,7 +721,7 @@ const copyToClipboard = async (text) => {
                     <div style={styles.formGroup}>
                       <label style={styles.formLabel}>
                         Screenshot
-                        <span style={styles.formLabelHint}> (AI generates basic structure - manual adjustment needed)</span>
+                        <span style={styles.formLabelHint}> (Auto-generates Figma code)</span>
                       </label>
                       <div
                         style={{
@@ -724,7 +747,7 @@ const copyToClipboard = async (text) => {
                             )}
                             {figmaCode && !isAnalyzing && (
                               <div style={styles.figmaBadge}>
-                                <span>✓</span> Basic structure ready
+                                <span>✓</span> Figma code ready
                               </div>
                             )}
                           </div>
@@ -750,12 +773,12 @@ const copyToClipboard = async (text) => {
                     </div>
 
                     <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>URL *</label>
+                      <label style={styles.formLabel}>URL</label>
                       <input
                         type="url"
                         value={newRef.url}
                         onChange={e => setNewRef({...newRef, url: e.target.value})}
-                        placeholder="https://example.com"
+                        placeholder="https://example.com (optional)"
                         style={styles.formInput}
                       />
                     </div>
@@ -771,6 +794,25 @@ const copyToClipboard = async (text) => {
                           <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>
                         ))}
                       </select>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Color</label>
+                      <div style={styles.colorPicker}>
+                        {COLORS.filter(c => c.id !== 'all').map(c => (
+                          <button
+                            key={c.id}
+                            style={{
+                              ...styles.colorButton,
+                              background: c.color,
+                              border: c.id === 'white' ? '1px solid #ddd' : 'none',
+                              ...(newRef.color === c.id ? styles.colorButtonActive : {}),
+                            }}
+                            onClick={(e) => { e.preventDefault(); setNewRef({...newRef, color: c.id}); }}
+                            title={c.name}
+                          />
+                        ))}
+                      </div>
                     </div>
 
                     <div style={styles.formGroup}>
@@ -813,7 +855,6 @@ const copyToClipboard = async (text) => {
                         <h3 style={styles.figmaCodeTitle}>
                           <span style={styles.figmaCodeIcon}>◫</span>
                           Figma Code
-                          <span style={styles.betaTag}>Beta</span>
                         </h3>
                         <button
                           style={{
@@ -825,9 +866,6 @@ const copyToClipboard = async (text) => {
                           {copySuccess ? '✓ Copied!' : 'Copy'}
                         </button>
                       </div>
-                      <div style={styles.figmaCodeNote}>
-                        ⚠️ AI generates basic structure only. Colors, spacing, and details need manual adjustment in Figma.
-                      </div>
                       <div style={styles.figmaCodeBox}>
                         <pre style={styles.figmaCodePre}>{figmaCode}</pre>
                       </div>
@@ -835,12 +873,19 @@ const copyToClipboard = async (text) => {
                         <p><strong>How to use:</strong></p>
                         <p>1. Open Figma → Plugins → Development → Console</p>
                         <p>2. Paste code and press Enter</p>
-                        <p>3. Adjust colors, spacing, fonts manually</p>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Image Zoom Modal */}
+          {imageZoom && (
+            <div style={styles.zoomOverlay} onClick={() => setImageZoom(null)}>
+              <button style={styles.zoomClose} onClick={() => setImageZoom(null)}>✕</button>
+              <img src={imageZoom} alt="Zoomed" style={styles.zoomImage} />
             </div>
           )}
         </div>
@@ -1270,9 +1315,9 @@ const copyToClipboard = async (text) => {
       modal: {
         background: '#fff',
         borderRadius: '24px',
-        maxWidth: '600px',
-        width: '100%',
-        maxHeight: '90vh',
+        maxWidth: '95vw',
+        width: '1200px',
+        maxHeight: '95vh',
         overflow: 'auto',
         position: 'relative',
       },
@@ -1292,8 +1337,10 @@ const copyToClipboard = async (text) => {
       },
       modalImage: {
         width: '100%',
-        aspectRatio: '16/10',
-        objectFit: 'cover',
+        maxHeight: '500px',
+        objectFit: 'contain',
+        background: '#f5f5f5',
+        cursor: 'zoom-in',
       },
       modalContent: {
         padding: '30px',
@@ -1661,24 +1708,6 @@ const copyToClipboard = async (text) => {
         fontSize: '15px',
         fontWeight: '600',
       },
-      betaTag: {
-        fontSize: '10px',
-        fontWeight: '600',
-        color: '#fbbf24',
-        background: 'rgba(251, 191, 36, 0.2)',
-        padding: '2px 6px',
-        borderRadius: '4px',
-        marginLeft: '4px',
-      },
-      figmaCodeNote: {
-        fontSize: '12px',
-        color: '#fbbf24',
-        background: 'rgba(251, 191, 36, 0.1)',
-        padding: '10px 12px',
-        borderRadius: '8px',
-        marginBottom: '12px',
-        lineHeight: '1.5',
-      },
       figmaCodeIcon: {
         color: '#6366f1',
       },
@@ -1719,6 +1748,50 @@ const copyToClipboard = async (text) => {
         fontSize: '12px',
         color: 'rgba(255,255,255,0.6)',
         lineHeight: '1.6',
+      },
+      colorPicker: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px',
+      },
+      colorButton: {
+        width: '28px',
+        height: '28px',
+        borderRadius: '50%',
+        cursor: 'pointer',
+        transition: 'transform 0.2s',
+      },
+      colorButtonActive: {
+        transform: 'scale(1.2)',
+        boxShadow: '0 0 0 3px rgba(99,102,241,0.5)',
+      },
+      zoomOverlay: {
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.95)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2000,
+        cursor: 'zoom-out',
+      },
+      zoomImage: {
+        maxWidth: '95vw',
+        maxHeight: '95vh',
+        objectFit: 'contain',
+      },
+      zoomClose: {
+        position: 'absolute',
+        top: '20px',
+        right: '20px',
+        width: '44px',
+        height: '44px',
+        background: 'rgba(255,255,255,0.1)',
+        border: 'none',
+        borderRadius: '50%',
+        color: '#fff',
+        fontSize: '20px',
+        cursor: 'pointer',
       },
     };
 
