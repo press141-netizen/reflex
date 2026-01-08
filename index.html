@@ -2,36 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Reflex – Image to Figma</title>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; }
+  </style>
 </head>
 <body>
 <script>
 /**
- * SAFETY WRAPPER
- * - Always preload fonts
- * - Force async IIFE
- * - Sanitize Inter font usage
+ * SAFETY EXECUTION WRAPPER (Quality version)
+ * - Preserves Inter font weights (does NOT replace them)
+ * - Dynamically preloads all Inter styles referenced in AI code
+ * - Ensures async IIFE wrapper exists
  */
-function wrapWithFontSafety(code) {
-  const preload = `(async () => {
-    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-    await figma.loadFontAsync({ family: "Inter", style: "Medium" });
-  `;
+function wrapWithDynamicFontSafety(code) {
+  const styleSet = new Set();
 
-  const postload = `
-  })();`;
+  // Collect Inter styles used in code (fontName assignments)
+  const regex = /family\\s*:\\s*["']Inter["']\\s*,\\s*style\\s*:\\s*["']([^"']+)["']/g;
+  let m;
+  while ((m = regex.exec(code)) !== null) {
+    styleSet.add(m[1]);
+  }
 
-  const sanitized = code.replace(
-    /fontName\s*=\s*{\s*family:\s*["']Inter["']\s*,\s*style:\s*["'][^"']+["']\s*}/g,
-    'fontName = { family: "Inter", style: "Regular" }'
+  // Always include at least Regular to avoid empty loads
+  styleSet.add("Regular");
+
+  const preloadLines = Array.from(styleSet).map((style) =>
+    `  await figma.loadFontAsync({ family: "Inter", style: ${JSON.stringify(style)} });`
+  ).join("\\n");
+
+  const hasIIFE = /^\\(async\\s*\\(\\)\\s*=>\\s*\\{/.test(code.trim());
+  const wrapped = hasIIFE
+    ? code.trim()
+    : `(async () => {\\n${code}\\n})();`;
+
+  // Inject preload at the top of the async IIFE body
+  const injected = wrapped.replace(
+    /^\\(async\\s*\\(\\)\\s*=>\\s*\\{\\n?/,
+    (match) => match + preloadLines + "\\n"
   );
 
-  return preload + sanitized + postload;
+  return injected;
 }
 
-// Example execution hook
+/**
+ * Helper: read image file into base64 and dimensions
+ */
+function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const img = new Image();
+      img.onload = () => {
+        resolve({
+          dataUrl,
+          base64: String(dataUrl).split(",")[1],
+          mimeType: String(dataUrl).slice(5, String(dataUrl).indexOf(";")) || "image/png",
+          width: img.naturalWidth || 0,
+          height: img.naturalHeight || 0,
+        });
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// NOTE: Your existing UI code should call this function with the AI-returned code.
 async function runGeneratedCode(figmaCode) {
-  const safeCode = wrapWithFontSafety(figmaCode);
+  const safeCode = wrapWithDynamicFontSafety(figmaCode);
   eval(safeCode);
 }
 </script>
