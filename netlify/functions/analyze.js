@@ -78,15 +78,17 @@ CRITICAL STYLE RULES:
   card.effects = [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.08 }, offset: { x: 0, y: 2 }, radius: 8, visible: true, blendMode: 'NORMAL' }];
 
 - Buttons with border: WHITE background + gray border + cornerRadius: 8
-- Text: Set fontName BEFORE characters
+- Text: Set fontName BEFORE characters, use DARK color for text
   text.fontName = { family: "Inter", style: "Medium" };
   text.characters = "text";
+  text.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1 } }]; // DARK text, NOT blue!
   
 - Icons: Use figma.createEllipse() for circular icons
 - Sizing: ONLY use "FIXED" or "AUTO" for primaryAxisSizingMode/counterAxisSizingMode (NEVER "FILL_CONTAINER")
 
 Look at the image carefully and match:
 - Exact colors (backgrounds should be WHITE if they look white)
+- TEXT COLOR: Use DARK gray/black { r: 0.1, g: 0.1, b: 0.1 } for text - NEVER use blue for regular text!
 - All text content
 - Layout and spacing
 - Number of elements (cards, icons, buttons)
