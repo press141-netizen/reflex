@@ -225,85 +225,195 @@
         }
       };
 
-      const analyzeImageWithAI = async (base64Image) => {
-        // base64Image is expected to be a dataURL: data:image/png;base64,....
-        const mimeType = (typeof base64Image === 'string' && base64Image.startsWith('data:'))
-          ? base64Image.slice(5, base64Image.indexOf(';')) || 'image/png'
-          : 'image/png';
-
-        const imageData = (typeof base64Image === 'string' && base64Image.includes(','))
-          ? base64Image.split(',')[1]
-          : base64Image;
-
-        const payload = {
-          image: imageData,
-          mimeType,
-          componentName: 'GeneratedComponent',
-        };
-
-        const response = await fetch('/.netlify/functions/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const txt = await response.text();
-          throw new Error(`Analyze API failed: ${response.status} ${txt}`);
+      const wrapWithDynamicFontSafety = (code) => {
+        // Collect Inter styles used and preload them. Preserve weights.
+        const styleSet = new Set();
+        const regex = /family\s*:\s*["']Inter["']\s*,\s*style\s*:\s*["']([^"']+)["']/g;
+        let m;
+        while ((m = regex.exec(code)) !== null) {
+          styleSet.add(m[1]);
         }
+        styleSet.add("Regular"); // always
 
-        const data = await response.json();
-        return data.figmaCode;
+        const preloadLines = Array.from(styleSet).map((style) =>
+          `  await figma.loadFontAsync({ family: "Inter", style: ${JSON.stringify(style)} });`
+        ).join("\n");
+
+        const trimmed = String(code || "").trim();
+        const hasIIFE = /^\(async\s*\(\)\s*=>\s*\{/.test(trimmed);
+
+        const wrapped = hasIIFE
+          ? trimmed
+          : `(async () => {\n${trimmed}\n})();`;
+
+        // Inject preload right after async IIFE opening
+        const injected = wrapped.replace(
+          /^\(async\s*\(\)\s*=>\s*\{\n?/,
+          (match) => match + preloadLines + "\n"
+        );
+
+        return injected;
       };
 
-      const generateFallbackCode = () => {
-        const name = newRef.title || 'GeneratedComponent';
-        return `// Figma Plugin API Code
-const component = figma.createComponent();
-component.name = "${name}";
-component.resize(400, 300);
-
-const frame = figma.createFrame();
-frame.name = "Container";
-frame.resize(400, 300);
-frame.layoutMode = "VERTICAL";
-frame.primaryAxisAlignItems = "CENTER";
-frame.counterAxisAlignItems = "CENTER";
-frame.paddingTop = 24;
-frame.paddingBottom = 24;
-frame.paddingLeft = 24;
-frame.paddingRight = 24;
-frame.itemSpacing = 16;
-frame.cornerRadius = 12;
-frame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
-frame.effects = [{
-  type: "DROP_SHADOW",
-  color: { r: 0, g: 0, b: 0, a: 0.1 },
-  offset: { x: 0, y: 4 },
-  radius: 20,
-  visible: true,
-  blendMode: "NORMAL"
-}];
-
-const title = figma.createText();
-await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
-title.fontName = { family: "Inter", style: "Semi Bold" };
-title.characters = "${name}";
-title.fontSize = 18;
-title.fills = [{ type: "SOLID", color: { r: 0.1, g: 0.1, b: 0.15 } }];
-
-frame.appendChild(title);
-component.appendChild(frame);
-
-component.x = figma.viewport.center.x - 200;
-component.y = figma.viewport.center.y - 150;
-
-figma.currentPage.selection = [component];
-figma.viewport.scrollAndZoomIntoView([component]);
-console.log("✅ Component created!");`;
+      const getImageMetaFromDataUrl = (dataUrl) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ width: img.naturalWidth || 0, height: img.naturalHeight || 0 });
+          img.onerror = () => resolve({ width: 0, height: 0 });
+          img.src = dataUrl;
+        });
       };
 
-      const copyToClipboard = async (text) => {
+      const analyzeImageWithAI = async (base64Image) => {
+        setIsAnalyzing(true);
+        setFigmaCode(null);
+
+        try {
+          // base64Image is a DataURL here
+          const mimeType = String(base64Image).slice(5, String(base64Image).indexOf(";")) || "image/png";
+          const base64Data = String(base64Image).split(",")[1] || "";
+
+          const meta = await getImageMetaFromDataUrl(base64Image);
+
+          const response = await fetch('/.netlify/functions/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64Data,
+              mimeType,
+              componentName: 'GeneratedComponent',
+              imageWidth: meta.width,
+              imageHeight: meta.height
+            })
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Analyze failed: ${response.status} ${errText}`);
+          }
+
+          const result = await response.json();
+          const rawCode = result.figmaCode || generateFallbackCode('GeneratedComponent');
+
+          // Safety: ensure fonts are preloaded and async wrapper exists, but DO NOT change weights.
+          const safeCode = wrapWithDynamicFontSafety(rawCode);
+
+          setFigmaCode(safeCode);
+        } catch (error) {
+          console.error('Error analyzing image:', error);
+          setFigmaCode(generateFallbackCode('GeneratedComponent'));
+        } finally {
+          setIsAnalyzing(false);
+        }
+      };
+
+      const generateFallbackCode = (name) => {
+        return `(async () => {
+  // Figma Plugin API Code (fallback)
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  await figma.loadFontAsync({ family: "Inter", style: "Medium" });
+
+  const component = figma.createComponent();
+  component.name = "${name}";
+  component.resize(1200, 220);
+
+  const frame = figma.createFrame();
+  frame.name = "Container";
+  frame.resize(1200, 220);
+  frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+  frame.cornerRadius = 12;
+  frame.layoutMode = "VERTICAL";
+  frame.primaryAxisSizingMode = "AUTO";
+  frame.counterAxisSizingMode = "FIXED";
+  frame.paddingTop = 20;
+  frame.paddingBottom = 20;
+  frame.paddingLeft = 24;
+  frame.paddingRight = 24;
+  frame.itemSpacing = 16;
+
+  // Header row
+  const header = figma.createFrame();
+  header.name = "Header";
+  header.layoutMode = "HORIZONTAL";
+  header.primaryAxisSizingMode = "AUTO";
+  header.counterAxisSizingMode = "AUTO";
+  header.itemSpacing = 12;
+  header.fills = [];
+
+  const icon = figma.createRectangle();
+  icon.name = "Icon";
+  icon.resize(18, 18);
+  icon.cornerRadius = 6;
+  icon.fills = [{ type: 'SOLID', color: { r: 0.31, g: 0.36, b: 0.93 } }];
+
+  const label = figma.createText();
+  label.name = "Label";
+  label.fontName = { family: "Inter", style: "Medium" };
+  label.fontSize = 16;
+  label.characters = "Research";
+  label.fills = [{ type: 'SOLID', color: { r: 0.12, g: 0.14, b: 0.18 } }];
+
+  header.appendChild(icon);
+  header.appendChild(label);
+
+  // Title
+  const title = figma.createText();
+  title.name = "Title";
+  title.fontName = { family: "Inter", style: "Medium" };
+  title.fontSize = 18;
+  title.characters = "You may also want to ask";
+  title.fills = [{ type: 'SOLID', color: { r: 0.12, g: 0.14, b: 0.18 } }];
+
+  // Cards row
+  const cards = figma.createFrame();
+  cards.name = "Cards";
+  cards.layoutMode = "HORIZONTAL";
+  cards.primaryAxisSizingMode = "AUTO";
+  cards.counterAxisSizingMode = "AUTO";
+  cards.itemSpacing = 16;
+  cards.fills = [];
+
+  const makeCard = (text) => {
+    const card = figma.createFrame();
+    card.name = "Card";
+    card.resize(360, 92);
+    card.layoutMode = "VERTICAL";
+    card.primaryAxisSizingMode = "FIXED";
+    card.counterAxisSizingMode = "FIXED";
+    card.paddingTop = 20;
+    card.paddingBottom = 20;
+    card.paddingLeft = 20;
+    card.paddingRight = 20;
+    card.cornerRadius = 16;
+    card.fills = [{ type: 'SOLID', color: { r: 0.965, g: 0.969, b: 0.98 } }];
+    card.strokes = [{ type: 'SOLID', color: { r: 0.91, g: 0.92, b: 0.94 } }];
+    card.strokeWeight = 1;
+
+    const t = figma.createText();
+    t.fontName = { family: "Inter", style: "Regular" };
+    t.fontSize = 16;
+    t.lineHeight = { value: 24, unit: "PIXELS" };
+    t.characters = text;
+    t.fills = [{ type: 'SOLID', color: { r: 0.12, g: 0.14, b: 0.18 } }];
+
+    card.appendChild(t);
+    return card;
+  };
+
+  cards.appendChild(makeCard("What industries are leading in LLM adoption?"));
+  cards.appendChild(makeCard("Can you break down specific use cases?"));
+  cards.appendChild(makeCard("What challenges do businesses face with LLMs?"));
+
+  frame.appendChild(header);
+  frame.appendChild(title);
+  frame.appendChild(cards);
+
+  component.appendChild(frame);
+  figma.currentPage.appendChild(component);
+  figma.viewport.scrollAndZoomIntoView([component]);
+})();`;
+      };
+const copyToClipboard = async (text) => {
         await navigator.clipboard.writeText(text || figmaCode);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
