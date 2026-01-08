@@ -456,7 +456,7 @@ const copyToClipboard = async (text) => {
       };
 
       const handleAddReference = () => {
-        if (!newRef.title || !newRef.url) return;
+        if (!newRef.title) return;
         
         const reference = {
           id: Date.now(),
