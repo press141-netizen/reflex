@@ -45,125 +45,53 @@ exports.handler = async (event) => {
           },
           {
             type: 'text',
-            text: `You are an expert Figma Plugin developer. Analyze this UI screenshot (${width}x${height}px) and generate PRECISE Figma Plugin API code to recreate it as accurately as possible.
+            text: `Generate Figma Plugin API code to recreate this UI screenshot exactly.
 
-CRITICAL REQUIREMENTS:
+RULES:
+1. Return ONLY JavaScript code - NO markdown, NO explanations
+2. Use this exact structure:
 
-1. OUTPUT FORMAT:
-- Return ONLY valid JavaScript code
-- NO markdown code blocks, NO explanations
-- Must start with: (async () => {
-- Must end with: })();
-
-2. FONT LOADING (REQUIRED AT START):
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
   await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
-  await figma.loadFontAsync({ family: "Inter", style: "Bold" });
 
-3. COMPONENT SETUP:
   const component = figma.createComponent();
   component.name = "${componentName || 'GeneratedComponent'}";
   component.resize(${width}, ${height});
+  component.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]; // WHITE background
 
-4. COLOR ACCURACY (VERY IMPORTANT):
-- Extract EXACT colors from the image
-- Use precise RGB values (0-1 range): { r: 0.98, g: 0.98, b: 0.98 }
-- MAIN BACKGROUND should usually be WHITE or very light: { r: 1, g: 1, b: 1 } or { r: 0.98, g: 0.98, b: 0.99 }
-- Common colors to look for:
-  - Pure white: { r: 1, g: 1, b: 1 }
-  - Light gray background: { r: 0.97, g: 0.97, b: 0.98 }
-  - Text dark: { r: 0.1, g: 0.1, b: 0.12 }
-  - Text medium: { r: 0.4, g: 0.4, b: 0.45 }
-  - Blue accent: { r: 0.25, g: 0.45, b: 0.95 }
-  - Border light: { r: 0.9, g: 0.9, b: 0.92 }
+  // YOUR CODE HERE - recreate all UI elements
 
-CRITICAL COLOR RULES:
-- If background looks WHITE in the image, use { r: 1, g: 1, b: 1 }
-- NEVER make backgrounds dark gray unless the original clearly is
-- Cards should ALWAYS have white background with subtle shadow
-
-5. LAYOUT STRUCTURE:
-- Use Auto Layout for all containers:
-  frame.layoutMode = "HORIZONTAL" or "VERTICAL";
-  frame.primaryAxisSizingMode = "FIXED" or "AUTO"; // ONLY these two values! NEVER use "FILL_CONTAINER"
-  frame.counterAxisSizingMode = "FIXED" or "AUTO"; // ONLY these two values! NEVER use "FILL_CONTAINER"
-  frame.primaryAxisAlignItems = "MIN" | "CENTER" | "MAX" | "SPACE_BETWEEN";
-  frame.counterAxisAlignItems = "MIN" | "CENTER" | "MAX";
-  frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 16;
-  frame.itemSpacing = 12;
-  
-IMPORTANT: For sizing modes, ONLY use "FIXED" or "AUTO". 
-- "FIXED" = explicit size set by resize()
-- "AUTO" = size determined by children (hug contents)
-- NEVER use "FILL_CONTAINER" - it will cause an error!
-
-6. BACKGROUNDS & BORDERS:
-- CARDS MUST HAVE:
-  * White background: fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]
-  * Subtle border: strokes = [{ type: 'SOLID', color: { r: 0.92, g: 0.92, b: 0.94 } }]; strokeWeight = 1;
-  * Rounded corners: cornerRadius = 12;
-  * Drop shadow: effects = [{
-      type: 'DROP_SHADOW',
-      color: { r: 0, g: 0, b: 0, a: 0.06 },
-      offset: { x: 0, y: 2 },
-      radius: 8,
-      visible: true,
-      blendMode: 'NORMAL'
-    }];
-
-- BUTTONS with border (outlined style):
-  * White background: fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]
-  * Border: strokes = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.88 } }]; strokeWeight = 1;
-  * Rounded: cornerRadius = 8;
-
-- NEVER leave cards with only strokes and no fill - they need WHITE fills!
-
-7. TEXT NODES:
-- Set fontName BEFORE characters:
-  const text = figma.createText();
-  text.fontName = { family: "Inter", style: "Medium" };
-  text.characters = "Your text here";
-  text.fontSize = 14;
-  text.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.12 } }];
-
-8. ICONS (Important):
-- For icons, create CIRCULAR placeholders using ellipse:
-  const icon = figma.createEllipse();
-  icon.resize(20, 20);
-  icon.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.65 } }];
-- For colored icons (like blue), use the accent color
-- Add descriptive names: icon.name = "Icon_Refresh";
-- Count the exact number of icons in the image and create that many
-- Toolbar icons should be circular or use simple shapes
-
-9. BUTTONS:
-- White background with border for outlined buttons
-- Include hover states styling
-- Proper padding and border-radius
-
-10. SPACING & SIZING:
-- Measure spacing carefully from the image
-- Use consistent spacing values (4, 8, 12, 16, 20, 24, 32)
-- Match element sizes as closely as possible
-
-11. FINAL CODE (REQUIRED):
   figma.currentPage.appendChild(component);
   figma.currentPage.selection = [component];
   figma.viewport.scrollAndZoomIntoView([component]);
-  console.log("✅ Component '${componentName || 'GeneratedComponent'}' created!");
 })();
 
-IMPORTANT: Look carefully at the image and reproduce:
-- Exact background colors (white vs gray)
-- Card styling with proper backgrounds, borders, shadows
-- Text colors and weights
-- Button styles
-- Spacing between elements
-- Border radius values
+CRITICAL STYLE RULES:
+- Main background: WHITE { r: 1, g: 1, b: 1 }
+- Cards: WHITE background + border + shadow + cornerRadius: 12
+  card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+  card.strokes = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.92 } }];
+  card.strokeWeight = 1;
+  card.cornerRadius = 12;
+  card.effects = [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.08 }, offset: { x: 0, y: 2 }, radius: 8, visible: true, blendMode: 'NORMAL' }];
 
-Generate the complete Figma Plugin API code now:`
+- Buttons with border: WHITE background + gray border + cornerRadius: 8
+- Text: Set fontName BEFORE characters
+  text.fontName = { family: "Inter", style: "Medium" };
+  text.characters = "text";
+  
+- Icons: Use figma.createEllipse() for circular icons
+- Sizing: ONLY use "FIXED" or "AUTO" for primaryAxisSizingMode/counterAxisSizingMode (NEVER "FILL_CONTAINER")
+
+Look at the image carefully and match:
+- Exact colors (backgrounds should be WHITE if they look white)
+- All text content
+- Layout and spacing
+- Number of elements (cards, icons, buttons)
+
+Generate the code now:`
           }
         ],
       }],
