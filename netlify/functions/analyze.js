@@ -17,7 +17,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { image, componentName } = JSON.parse(event.body);
+    const { image, componentName, mimeType, imageWidth, imageHeight } = JSON.parse(event.body);
 
     if (!image) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Image is required' }) };
@@ -29,57 +29,117 @@ exports.handler = async (event) => {
       return { statusCode: 500, headers, body: JSON.stringify({ error: 'API key not configured' }) };
     }
 
+    const actualMimeType = mimeType || 'image/png';
+    const width = imageWidth || 800;
+    const height = imageHeight || 600;
+
     const requestBody = JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      max_tokens: 8000,
       messages: [{
         role: 'user',
         content: [
           {
             type: 'image',
-            source: { type: 'base64', media_type: 'image/png', data: image },
+            source: { type: 'base64', media_type: actualMimeType, data: image },
           },
           {
             type: 'text',
-            text: `Analyze this UI screenshot and generate Figma Plugin API code to recreate it.
+            text: `You are an expert Figma Plugin developer. Analyze this UI screenshot (${width}x${height}px) and generate PRECISE Figma Plugin API code to recreate it as accurately as possible.
 
-CRITICAL RULES:
-1. Return ONLY valid JavaScript code - no markdown, no explanations, no code blocks
-2. MUST start with this exact pattern (async IIFE with font loading):
+CRITICAL REQUIREMENTS:
 
+1. OUTPUT FORMAT:
+- Return ONLY valid JavaScript code
+- NO markdown code blocks, NO explanations
+- Must start with: (async () => {
+- Must end with: })();
+
+2. FONT LOADING (REQUIRED AT START):
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
   await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
   await figma.loadFontAsync({ family: "Inter", style: "Bold" });
 
-3. Use component name: "${componentName || 'GeneratedComponent'}"
-4. Analyze colors, layout, spacing, typography from the image
-5. Use Auto Layout where appropriate (layoutMode, padding, itemSpacing)
-6. For ALL text nodes, use ONLY Inter font with one of these styles: "Regular", "Medium", "Semi Bold", "Bold"
-7. Set fontName BEFORE setting characters: textNode.fontName = { family: "Inter", style: "Regular" };
-
-8. MUST end with:
-  figma.currentPage.appendChild(component);
-  figma.currentPage.selection = [component];
-  figma.viewport.scrollAndZoomIntoView([component]);
-  console.log("✅ Component created!");
-})();
-
-Example structure:
-(async () => {
-  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-  await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
-  
+3. COMPONENT SETUP:
   const component = figma.createComponent();
   component.name = "${componentName || 'GeneratedComponent'}";
-  // ... rest of code
-  
+  component.resize(${width}, ${height});
+
+4. COLOR ACCURACY (VERY IMPORTANT):
+- Extract EXACT colors from the image
+- Use precise RGB values (0-1 range): { r: 0.98, g: 0.98, b: 0.98 }
+- Common colors to look for:
+  - Pure white: { r: 1, g: 1, b: 1 }
+  - Light gray background: { r: 0.98, g: 0.98, b: 0.99 } or { r: 0.96, g: 0.96, b: 0.97 }
+  - Text dark: { r: 0.1, g: 0.1, b: 0.12 }
+  - Text medium: { r: 0.4, g: 0.4, b: 0.45 }
+  - Blue accent: { r: 0.2, g: 0.4, b: 0.95 }
+  - Border light: { r: 0.9, g: 0.9, b: 0.92 }
+
+5. LAYOUT STRUCTURE:
+- Use Auto Layout for all containers:
+  frame.layoutMode = "HORIZONTAL" or "VERTICAL";
+  frame.primaryAxisAlignItems = "MIN" | "CENTER" | "MAX" | "SPACE_BETWEEN";
+  frame.counterAxisAlignItems = "MIN" | "CENTER" | "MAX";
+  frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 16;
+  frame.itemSpacing = 12;
+
+6. BACKGROUNDS & BORDERS:
+- Cards should have WHITE background: fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]
+- Add subtle borders: strokes = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.92 } }]; strokeWeight = 1;
+- Add corner radius: cornerRadius = 8; or cornerRadius = 12;
+- Add shadows for cards:
+  effects = [{
+    type: 'DROP_SHADOW',
+    color: { r: 0, g: 0, b: 0, a: 0.08 },
+    offset: { x: 0, y: 2 },
+    radius: 8,
+    visible: true,
+    blendMode: 'NORMAL'
+  }];
+
+7. TEXT NODES:
+- Set fontName BEFORE characters:
+  const text = figma.createText();
+  text.fontName = { family: "Inter", style: "Medium" };
+  text.characters = "Your text here";
+  text.fontSize = 14;
+  text.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.12 } }];
+
+8. ICONS (Important):
+- For icons, create recognizable placeholder shapes
+- Use rectangles or ellipses with appropriate colors
+- Add descriptive names: icon.name = "Icon_Refresh";
+- Match the approximate size of icons in the image
+
+9. BUTTONS:
+- White background with border for outlined buttons
+- Include hover states styling
+- Proper padding and border-radius
+
+10. SPACING & SIZING:
+- Measure spacing carefully from the image
+- Use consistent spacing values (4, 8, 12, 16, 20, 24, 32)
+- Match element sizes as closely as possible
+
+11. FINAL CODE (REQUIRED):
   figma.currentPage.appendChild(component);
   figma.currentPage.selection = [component];
   figma.viewport.scrollAndZoomIntoView([component]);
-  console.log("✅ Component created!");
-})();`
+  console.log("✅ Component '${componentName || 'GeneratedComponent'}' created!");
+})();
+
+IMPORTANT: Look carefully at the image and reproduce:
+- Exact background colors (white vs gray)
+- Card styling with proper backgrounds, borders, shadows
+- Text colors and weights
+- Button styles
+- Spacing between elements
+- Border radius values
+
+Generate the complete Figma Plugin API code now:`
           }
         ],
       }],
@@ -113,13 +173,14 @@ Example structure:
     });
 
     if (apiResponse.statusCode !== 200) {
+      console.error('API Error:', JSON.stringify(apiResponse.body));
       return { statusCode: apiResponse.statusCode, headers, body: JSON.stringify({ error: 'API failed', details: apiResponse.body }) };
     }
 
     let figmaCode = apiResponse.body.content?.[0]?.text || '';
     
     // Clean up markdown code blocks if present
-    figmaCode = figmaCode.replace(/```javascript\n?/g, '').replace(/```\n?/g, '').trim();
+    figmaCode = figmaCode.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
 
     return {
       statusCode: 200,
@@ -128,6 +189,7 @@ Example structure:
     };
 
   } catch (error) {
+    console.error('Function error:', error);
     return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
   }
 };
