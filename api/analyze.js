@@ -1,9 +1,8 @@
 export const config = {
-  maxDuration: 60, // 60초 타임아웃
+  maxDuration: 60,
 };
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -47,77 +46,83 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Generate Figma code for this UI. Size: ${width}x${height}px.
+            { type: 'text', text: `Generate Figma Plugin API code to recreate this UI. Size: ${width}x${height}px.
 
-ANALYZE THE LAYOUT CAREFULLY:
-1. Count rows and columns
-2. If buttons are in a 2x2 grid, create 2 horizontal rows with 2 buttons each
-3. Match the exact structure
-
-Return ONLY JavaScript:
+Return ONLY JavaScript code (no markdown, no explanation):
 
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
+  await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
   
   const frame = figma.createFrame();
-  frame.name = "${componentName || 'Frame'}";
+  frame.name = "${componentName || 'GeneratedComponent'}";
   frame.resize(${width}, ${height});
-  frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+  frame.fills = [{ type: 'SOLID', color: { r: 0.97, g: 0.97, b: 0.98 } }];
+  frame.cornerRadius = 16;
   frame.layoutMode = "VERTICAL";
   frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 16;
-  frame.itemSpacing = 12;
+  frame.itemSpacing = 8;
   frame.primaryAxisSizingMode = "AUTO";
   frame.counterAxisSizingMode = "AUTO";
   
-  // Add elements...
+  // Build UI here...
   
   figma.currentPage.appendChild(frame);
   figma.viewport.scrollAndZoomIntoView([frame]);
 })();
 
-LAYOUT PATTERNS:
+ELEMENT PATTERNS TO USE:
 
-// 2-column header row
-const headerRow = figma.createFrame();
-headerRow.layoutMode = "HORIZONTAL";
-headerRow.primaryAxisSizingMode = "FIXED";
-headerRow.counterAxisSizingMode = "AUTO";
-headerRow.resize(${width - 32}, 30);
-headerRow.itemSpacing = 16;
-headerRow.fills = [];
+// Menu item row (icon + text)
+const menuItem = figma.createFrame();
+menuItem.name = "MenuItem";
+menuItem.layoutMode = "HORIZONTAL";
+menuItem.counterAxisAlignItems = "CENTER";
+menuItem.itemSpacing = 12;
+menuItem.paddingTop = menuItem.paddingBottom = 12;
+menuItem.paddingLeft = menuItem.paddingRight = 16;
+menuItem.fills = [];
+menuItem.primaryAxisSizingMode = "AUTO";
+menuItem.counterAxisSizingMode = "AUTO";
 
-// 2x2 button grid = 2 rows, each with 2 buttons
-const buttonRow = figma.createFrame();
-buttonRow.layoutMode = "HORIZONTAL";
-buttonRow.itemSpacing = 8;
-buttonRow.fills = [];
+// Active/selected menu item (with colored background)
+menuItem.fills = [{ type: 'SOLID', color: { r: 0.93, g: 0.95, b: 1 } }];
+menuItem.cornerRadius = 8;
 
-// Outlined button (white bg + border)
-const outlinedBtn = figma.createFrame();
-outlinedBtn.layoutMode = "HORIZONTAL";
-outlinedBtn.primaryAxisSizingMode = "AUTO";
-outlinedBtn.counterAxisSizingMode = "AUTO";
-outlinedBtn.paddingTop = outlinedBtn.paddingBottom = 8;
-outlinedBtn.paddingLeft = outlinedBtn.paddingRight = 16;
-outlinedBtn.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-outlinedBtn.strokes = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
-outlinedBtn.strokeWeight = 1;
-outlinedBtn.cornerRadius = 4;
+// Icon placeholder (square with rounded corners)
+const icon = figma.createRectangle();
+icon.name = "Icon";
+icon.resize(20, 20);
+icon.cornerRadius = 4;
+icon.fills = [{ type: 'SOLID', color: { r: 0.4, g: 0.4, b: 0.9 } }];
 
-// Filled button (gray background, NO border)
-const filledBtn = figma.createFrame();
-filledBtn.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
-filledBtn.strokes = [];
+// Text label
+const label = figma.createText();
+label.fontName = { family: "Inter", style: "Medium" };
+label.characters = "Menu Item";
+label.fontSize = 14;
+label.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.25 } }];
 
-// Blue text link
-text.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.4, b: 0.9 } }];
+// Logo (larger rounded rectangle)
+const logo = figma.createRectangle();
+logo.name = "Logo";
+logo.resize(48, 48);
+logo.cornerRadius = 12;
+logo.fills = [{ type: 'SOLID', color: { r: 0.35, g: 0.4, b: 0.95 } }];
 
-Rules:
-- NO markdown, code only
-- Set fontName BEFORE characters
+// Card container (white background)
+const card = figma.createFrame();
+card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+card.cornerRadius = 12;
+card.effects = [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.08 }, offset: { x: 0, y: 2 }, radius: 8, visible: true, blendMode: 'NORMAL' }];
+
+RULES:
 - Use "FIXED" or "AUTO" for sizing (NEVER "FILL_CONTAINER")
-- Match button grid layout exactly (2x2 = 2 rows of 2)` }
+- Set fontName BEFORE setting characters
+- Match colors from image (backgrounds, text, icons)
+- Create icon placeholders as rectangles with cornerRadius
+- Use layoutMode for all containers` }
           ],
         }],
       }),
