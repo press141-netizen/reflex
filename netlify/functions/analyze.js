@@ -56,6 +56,15 @@ CRITICAL RULES:
 3. Use Auto Layout for everything
 4. Match the WIDTH and HEIGHT proportions from the image
 5. ONLY use "FIXED" or "AUTO" for sizing modes
+6. MATCH EXACT COLORS from the image - look carefully at text colors, backgrounds, borders
+
+COLOR MATCHING (IMPORTANT):
+- Look at each text element and match its EXACT color
+- If text is BLUE/PURPLE, use blue: { r: 0.4, g: 0.4, b: 0.9 } or similar
+- If text is GRAY, use gray: { r: 0.5, g: 0.5, b: 0.55 }
+- If text is BLACK, use: { r: 0.1, g: 0.1, b: 0.1 }
+- Match border colors exactly (light gray, blue, etc.)
+- Match background colors exactly
 
 CODE STRUCTURE:
 
@@ -93,12 +102,16 @@ row.counterAxisSizingMode = "AUTO";
 row.itemSpacing = 8;
 row.fills = [];
 
-// Text label
+// Text label - MATCH COLOR FROM IMAGE
 const label = figma.createText();
 label.fontName = { family: "Inter", style: "Regular" };
 label.characters = "Text";
 label.fontSize = 13;
-label.fills = [{ type: 'SOLID', color: { r: 0.3, g: 0.3, b: 0.3 } }];
+// Use the EXACT color from the image:
+// - Blue/purple text: { r: 0.4, g: 0.45, b: 0.85 }
+// - Gray text: { r: 0.5, g: 0.5, b: 0.55 }
+// - Black text: { r: 0.1, g: 0.1, b: 0.15 }
+label.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.55 } }];
 
 // Button with border
 const btn = figma.createFrame();
@@ -152,6 +165,8 @@ IMPORTANT:
 - If image is 240px wide with 2 columns, each column ~100px
 - Match padding and spacing visually
 - Use fills = [] for transparent containers
+- CRITICAL: Match EXACT text colors from the image (blue, gray, black, etc.)
+- If border is dashed in image, use solid border with light color as approximation
 
 Generate the code now:`
           }
