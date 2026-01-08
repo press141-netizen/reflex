@@ -30,8 +30,8 @@ exports.handler = async (event) => {
     }
 
     const actualMimeType = mimeType || 'image/png';
-    const width = imageWidth || 800;
-    const height = imageHeight || 600;
+    const width = imageWidth || 400;
+    const height = imageHeight || 300;
 
     const requestBody = JSON.stringify({
       model: 'claude-sonnet-4-20250514',
@@ -45,102 +45,115 @@ exports.handler = async (event) => {
           },
           {
             type: 'text',
-            text: `You are a Figma expert. Analyze this UI and generate Figma Plugin API code.
+            text: `Analyze this UI screenshot and generate Figma Plugin API code.
 
-STEP 1 - ANALYZE THE LAYOUT:
-- How many columns? (1, 2, 3?)
-- How many rows?
-- What elements are in each cell?
+IMAGE SIZE: ${width}px × ${height}px
+Keep this exact width and height ratio!
 
-STEP 2 - IDENTIFY ELEMENTS:
-- Headers/titles (text)
-- Buttons (with borders or filled)
-- Input fields
-- Images/icons (use rectangles as placeholders)
-- Labels
+CRITICAL RULES:
+1. Return ONLY JavaScript code - NO markdown, NO explanations
+2. Create a FRAME (not component): figma.createFrame()
+3. Use Auto Layout for everything
+4. Match the WIDTH and HEIGHT proportions from the image
+5. ONLY use "FIXED" or "AUTO" for sizing modes
 
-STEP 3 - GENERATE CODE:
+CODE STRUCTURE:
 
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
 
-  const component = figma.createComponent();
-  component.name = "${componentName || 'GeneratedComponent'}";
-  component.resize(${width}, ${height});
-  component.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-  component.layoutMode = "VERTICAL";
-  component.paddingTop = component.paddingBottom = component.paddingLeft = component.paddingRight = 16;
-  component.itemSpacing = 12;
-  component.primaryAxisSizingMode = "AUTO";
-  component.counterAxisSizingMode = "FIXED";
+  // Main frame - USE EXACT IMAGE DIMENSIONS
+  const frame = figma.createFrame();
+  frame.name = "${componentName || 'GeneratedFrame'}";
+  frame.resize(${width}, ${height});
+  frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+  frame.layoutMode = "VERTICAL";
+  frame.primaryAxisSizingMode = "FIXED";
+  frame.counterAxisSizingMode = "FIXED";
+  frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 12;
+  frame.itemSpacing = 8;
 
-  // === YOUR CODE HERE ===
+  // Add child elements here...
 
-  figma.currentPage.appendChild(component);
-  figma.currentPage.selection = [component];
-  figma.viewport.scrollAndZoomIntoView([component]);
-  console.log("✅ Done! Adjust in Figma as needed.");
+  figma.currentPage.appendChild(frame);
+  figma.currentPage.selection = [frame];
+  figma.viewport.scrollAndZoomIntoView([frame]);
+  console.log("✅ Frame created!");
 })();
 
-RULES:
-1. Return ONLY JavaScript code - NO markdown, NO explanations
-2. Use layoutMode "HORIZONTAL" for rows, "VERTICAL" for columns
-3. ONLY use "FIXED" or "AUTO" for sizing (NEVER "FILL_CONTAINER")
-4. Set fontName BEFORE characters
+ELEMENT PATTERNS:
 
-ELEMENT STYLES:
-
-// Row container (horizontal layout)
+// Horizontal row
 const row = figma.createFrame();
+row.name = "Row";
 row.layoutMode = "HORIZONTAL";
-row.itemSpacing = 16;
-row.fills = [];
 row.primaryAxisSizingMode = "AUTO";
 row.counterAxisSizingMode = "AUTO";
+row.itemSpacing = 8;
+row.fills = [];
 
-// Text
-const text = figma.createText();
-text.fontName = { family: "Inter", style: "Medium" };
-text.characters = "Label";
-text.fontSize = 14;
-text.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.2 } }];
+// Text label
+const label = figma.createText();
+label.fontName = { family: "Inter", style: "Regular" };
+label.characters = "Text";
+label.fontSize = 13;
+label.fills = [{ type: 'SOLID', color: { r: 0.3, g: 0.3, b: 0.3 } }];
 
-// Button with border (outlined)
+// Button with border
 const btn = figma.createFrame();
+btn.name = "Button";
 btn.layoutMode = "HORIZONTAL";
-btn.paddingTop = btn.paddingBottom = 8;
-btn.paddingLeft = btn.paddingRight = 16;
+btn.primaryAxisSizingMode = "AUTO";
+btn.counterAxisSizingMode = "AUTO";
+btn.paddingTop = btn.paddingBottom = 6;
+btn.paddingLeft = btn.paddingRight = 12;
 btn.cornerRadius = 4;
 btn.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
 btn.strokes = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
 btn.strokeWeight = 1;
+// Add text to button
+const btnText = figma.createText();
+btnText.fontName = { family: "Inter", style: "Medium" };
+btnText.characters = "Button";
+btnText.fontSize = 12;
+btn.appendChild(btnText);
 
-// Filled button (like 파일업로드)
+// Filled button (gray background)
 const filledBtn = figma.createFrame();
-filledBtn.layoutMode = "HORIZONTAL";
-filledBtn.paddingTop = filledBtn.paddingBottom = 8;
-filledBtn.paddingLeft = filledBtn.paddingRight = 16;
-filledBtn.cornerRadius = 4;
-filledBtn.fills = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } }];
+filledBtn.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
 
-// Image placeholder
-const imgPlaceholder = figma.createRectangle();
-imgPlaceholder.resize(80, 80);
-imgPlaceholder.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
-imgPlaceholder.cornerRadius = 4;
+// Icon placeholder (circle or square)
+const icon = figma.createEllipse();
+icon.resize(16, 16);
+icon.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.6 } }];
 
-// Input field
+// Folder icon (rectangle)
+const folder = figma.createRectangle();
+folder.resize(16, 14);
+folder.fills = [{ type: 'SOLID', color: { r: 0.3, g: 0.5, b: 0.9 } }];
+folder.cornerRadius = 2;
+
+// Input/Search field
 const input = figma.createFrame();
 input.layoutMode = "HORIZONTAL";
-input.resize(200, 36);
-input.paddingLeft = input.paddingRight = 12;
+input.primaryAxisSizingMode = "FIXED";
+input.counterAxisSizingMode = "AUTO";
+input.resize(200, 32);
+input.paddingLeft = input.paddingRight = 10;
+input.paddingTop = input.paddingBottom = 6;
+input.cornerRadius = 4;
 input.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
 input.strokes = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } }];
 input.strokeWeight = 1;
-input.cornerRadius = 4;
 
-Now analyze the image and generate the code:`
+IMPORTANT:
+- Estimate element sizes based on proportions in the image
+- If image is 240px wide with 2 columns, each column ~100px
+- Match padding and spacing visually
+- Use fills = [] for transparent containers
+
+Generate the code now:`
           }
         ],
       }],
