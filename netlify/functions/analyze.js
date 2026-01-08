@@ -1,226 +1,139 @@
-const https = require('https');
-
-// Netlify Function: /.netlify/functions/analyze
-// Proxies a UI screenshot to Anthropic and returns runnable Figma Plugin API code.
-// Safety: post-process model output to enforce async wrapper + font loading order.
-
-function normalizeMimeType(mimeType) {
-  const allowed = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
-  if (!mimeType) return 'image/png';
-  const mt = String(mimeType).toLowerCase();
-  if (!allowed.has(mt)) return 'image/png';
-  return mt === 'image/jpg' ? 'image/jpeg' : mt;
-}
-
-function extractInterStyles(jsCode) {
-  const styles = new Set();
-  const re = /family\s*:\s*["']Inter["']\s*,\s*style\s*:\s*["']([^"']+)["']/g;
-  let m;
-  while ((m = re.exec(jsCode)) !== null) {
-    const style = (m[1] || '').trim();
-    if (style) styles.add(style);
-  }
-
-  // Always include safe defaults
-  styles.add('Regular');
-  styles.add('Medium');
-
-  return Array.from(styles);
-}
-
-function ensureAsyncIIFE(jsCode) {
-  const trimmed = String(jsCode || '').trim();
-  if (!trimmed) return '(async () => {})();';
-
-  // Detect if already wrapped in an async IIFE.
-  const alreadyWrapped = /^\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*\}\s*\)\s*\(\s*\)\s*;?\s*$/.test(trimmed);
-  if (alreadyWrapped) return trimmed;
-
-  return `
-(async () => {
-${trimmed}
-})();
-`.trim();
-}
-
-function injectFontLoads(jsCode, styles) {
-  const code = String(jsCode || '');
-  const loadLines = styles
-    .map((style) => `  await figma.loadFontAsync({ family: "Inter", style: "${style}" });`)
-    .join('\n');
-
-  // If code is an async IIFE, inject right after the first opening brace.
-  // Otherwise, we'll wrap later.
-  if (/^\(\s*async\s*\(\s*\)\s*=>\s*\{/.test(code.trim())) {
-    // Avoid duplicating identical load lines if they already exist
-    const alreadyHasRegular = /loadFontAsync\(\s*\{\s*family\s*:\s*["']Inter["']\s*,\s*style\s*:\s*["']Regular["']\s*\}\s*\)/.test(code);
-    const alreadyHasMedium = /loadFontAsync\(\s*\{\s*family\s*:\s*["']Inter["']\s*,\s*style\s*:\s*["']Medium["']\s*\}\s*\)/.test(code);
-    if (alreadyHasRegular && alreadyHasMedium) {
-      return code;
-    }
-
-    return code.replace(
-      /^(\(\s*async\s*\(\s*\)\s*=>\s*\{\s*)/,
-      `$1\n${loadLines}\n`
-    );
-  }
-
-  // Not wrapped yet — just prepend loads at the top (wrapper will be added later).
-  return `${loadLines}\n${code}`;
-}
-
-function postProcessFigmaCode(rawCode) {
-  let code = String(rawCode || '').trim();
-
-  // Remove accidental Markdown fences if the model included them.
-  code = code.replace(/^```[a-zA-Z]*\s*/g, '').replace(/```\s*$/g, '').trim();
-
-  const styles = extractInterStyles(code);
-  code = injectFontLoads(code, styles);
-  code = ensureAsyncIIFE(code);
-
-  return code;
-}
-
-exports.handler = async (event) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json',
-  };
-
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
-  }
-
+/**
+ * Netlify Function: analyze
+ * - Sends screenshot to Anthropic
+ * - Returns Figma Plugin JS code (string) to recreate UI
+ *
+ * Expected body (JSON):
+ * {
+ *   "image": "<base64-no-dataurl>",
+ *   "mimeType": "image/png" | "image/jpeg" | "image/webp",
+ *   "componentName": "GeneratedComponent",
+ *   "imageWidth": 0,
+ *   "imageHeight": 0
+ * }
+ */
+export default async (request, context) => {
   try {
-    const { image, componentName, mimeType } = JSON.parse(event.body || '{}');
-
-    if (!image) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Image is required' }) };
+    if (request.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
+        status: 405,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      console.error('ANTHROPIC_API_KEY is not set');
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'API key not configured' }),
-      };
+      return new Response(JSON.stringify({ error: "Missing ANTHROPIC_API_KEY env var" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const safeMimeType = normalizeMimeType(mimeType);
-    const safeName = componentName || 'GeneratedComponent';
+    const body = await request.json().catch(() => ({}));
+    const image = body.image;
+    const mimeType = body.mimeType || "image/png";
+    const componentName = body.componentName || "GeneratedComponent";
+    const imageWidth = Number(body.imageWidth || 0);
+    const imageHeight = Number(body.imageHeight || 0);
 
-    const prompt = `You are generating JavaScript for a Figma plugin (Figma Plugin API).
+    if (!image || typeof image !== "string") {
+      return new Response(JSON.stringify({ error: "Missing image (base64)" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
-CRITICAL RULES (must follow exactly):
-1) Output MUST be pure JavaScript code only. No markdown, no explanations, no comments.
-2) Wrap the ENTIRE output in an async IIFE:
-   (async () => { /* code */ })();
-   Do NOT use top-level await outside the IIFE.
-3) BEFORE creating ANY text node (figma.createText) OR setting any text font (text.fontName),
-   you MUST call and await figma.loadFontAsync for that exact font.
-4) Use Inter as the only font family.
-   If you use any style other than Regular/Medium (e.g. Semi Bold/Bold), you MUST load it too.
-5) Create a component named "${safeName}".
-   The code MUST define: const component = figma.createComponent();
-   and set: component.name = "${safeName}";
-6) End with the following exact lines:
-   figma.currentPage.appendChild(component);
-   figma.currentPage.selection = [component];
-   figma.viewport.scrollAndZoomIntoView([component]);
-   console.log("✅ Component created!");
+    // A stronger "layout-first" instruction to reduce mismatches.
+    const system = `You generate JavaScript code that runs inside a Figma plugin environment.
+Output MUST be pure JavaScript code only (no markdown, no backticks, no explanations).
 
-TASK:
-Analyze this UI screenshot and generate Figma Plugin API code to recreate it as closely as reasonable.
-Prefer Auto Layout where appropriate. Use rectangles with fills/strokes, text nodes, and simple layout.
-Keep the code robust and runnable.`;
+GOAL:
+Recreate the provided UI screenshot as a Figma Component as closely as possible.
 
-    const requestBody = JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+CRITICAL FIGMA RULES:
+- Wrap everything in: (async () => { ... })();
+- Before creating or editing ANY Text node (figma.createText, setting characters, fontName), you MUST await figma.loadFontAsync for that font.
+- Use ONLY the "Inter" font family.
+- Use exact Inter styles used: Regular, Medium, Semi Bold, Bold (Figma naming).
+- Prefer Auto Layout frames. Use padding, itemSpacing, and alignment to match screenshot.
+
+FIDELITY RULES (very important):
+- Match the overall component size to the screenshot aspect ratio. If image dimensions are provided, use them as the base.
+- Match: spacing/padding, corner radius, background fills, strokes, shadows, and text sizes/weights.
+- Use realistic values (e.g., radius 12, 16, 20 etc) and consistent spacing scale (4/8/12/16/24/32).
+- Create separate frames for header row, title text, and each suggestion card.
+- Cards: rounded rectangle background, subtle stroke or shadow if visible, equal height, consistent gaps.
+- The icon + label group on the left should align vertically with the title.
+
+OUTPUT REQUIREMENTS:
+- Create a component named exactly: ${componentName}
+- Append it to the current page, center it in viewport.
+- Keep layer names meaningful.
+`;
+
+    const userText = `Analyze the screenshot and generate Figma plugin JavaScript to recreate it.
+Image size (if provided): ${imageWidth}x${imageHeight}.
+If dimensions are 0, choose a reasonable component size close to the screenshot (e.g., width 1200, height proportional).`;
+
+    const anthropicBody = {
+      model: "claude-3-5-sonnet-20240620",
       max_tokens: 4096,
+      system,
       messages: [
         {
-          role: 'user',
+          role: "user",
           content: [
+            { type: "text", text: userText },
             {
-              type: 'image',
+              type: "image",
               source: {
-                type: 'base64',
-                media_type: safeMimeType,
+                type: "base64",
+                media_type: mimeType,
                 data: image,
               },
-            },
-            {
-              type: 'text',
-              text: prompt,
             },
           ],
         },
       ],
+    };
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(anthropicBody),
     });
 
-    const apiResponse = await new Promise((resolve, reject) => {
-      const req = https.request(
-        {
-          hostname: 'api.anthropic.com',
-          path: '/v1/messages',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'Content-Length': Buffer.byteLength(requestBody),
-          },
-        },
-        (res) => {
-          let data = '';
-          res.on('data', (chunk) => (data += chunk));
-          res.on('end', () => {
-            try {
-              resolve({ statusCode: res.statusCode, body: JSON.parse(data) });
-            } catch (e) {
-              resolve({ statusCode: res.statusCode, body: data });
-            }
-          });
-        }
-      );
-
-      req.on('error', reject);
-      req.write(requestBody);
-      req.end();
-    });
-
-    if (apiResponse.statusCode !== 200) {
-      console.error('API Error:', apiResponse.body);
-      return {
-        statusCode: apiResponse.statusCode,
-        headers,
-        body: JSON.stringify({ error: 'AI API request failed', details: apiResponse.body }),
-      };
+    if (!resp.ok) {
+      const txt = await resp.text();
+      return new Response(JSON.stringify({ error: "Anthropic request failed", detail: txt }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const rawFigmaCode = apiResponse.body?.content?.[0]?.text || '';
-    const figmaCode = postProcessFigmaCode(rawFigmaCode);
+    const data = await resp.json();
+    const content = data?.content || [];
+    const textParts = content.filter((c) => c.type === "text").map((c) => c.text || "");
+    let figmaCode = textParts.join("\n").trim();
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ success: true, figmaCode }),
-    };
-  } catch (error) {
-    console.error('Function error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Internal server error', message: error.message }),
-    };
+    // Strip accidental markdown fences if any.
+    figmaCode = figmaCode
+      .replace(/^```[a-zA-Z]*\n/, "")
+      .replace(/\n```$/, "")
+      .trim();
+
+    return new Response(JSON.stringify({ figmaCode }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Unexpected error", detail: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 };
