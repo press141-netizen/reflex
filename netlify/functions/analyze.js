@@ -70,13 +70,19 @@ CRITICAL REQUIREMENTS:
 4. COLOR ACCURACY (VERY IMPORTANT):
 - Extract EXACT colors from the image
 - Use precise RGB values (0-1 range): { r: 0.98, g: 0.98, b: 0.98 }
+- MAIN BACKGROUND should usually be WHITE or very light: { r: 1, g: 1, b: 1 } or { r: 0.98, g: 0.98, b: 0.99 }
 - Common colors to look for:
   - Pure white: { r: 1, g: 1, b: 1 }
-  - Light gray background: { r: 0.98, g: 0.98, b: 0.99 } or { r: 0.96, g: 0.96, b: 0.97 }
+  - Light gray background: { r: 0.97, g: 0.97, b: 0.98 }
   - Text dark: { r: 0.1, g: 0.1, b: 0.12 }
   - Text medium: { r: 0.4, g: 0.4, b: 0.45 }
-  - Blue accent: { r: 0.2, g: 0.4, b: 0.95 }
+  - Blue accent: { r: 0.25, g: 0.45, b: 0.95 }
   - Border light: { r: 0.9, g: 0.9, b: 0.92 }
+
+CRITICAL COLOR RULES:
+- If background looks WHITE in the image, use { r: 1, g: 1, b: 1 }
+- NEVER make backgrounds dark gray unless the original clearly is
+- Cards should ALWAYS have white background with subtle shadow
 
 5. LAYOUT STRUCTURE:
 - Use Auto Layout for all containers:
@@ -94,18 +100,25 @@ IMPORTANT: For sizing modes, ONLY use "FIXED" or "AUTO".
 - NEVER use "FILL_CONTAINER" - it will cause an error!
 
 6. BACKGROUNDS & BORDERS:
-- Cards should have WHITE background: fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]
-- Add subtle borders: strokes = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.92 } }]; strokeWeight = 1;
-- Add corner radius: cornerRadius = 8; or cornerRadius = 12;
-- Add shadows for cards:
-  effects = [{
-    type: 'DROP_SHADOW',
-    color: { r: 0, g: 0, b: 0, a: 0.08 },
-    offset: { x: 0, y: 2 },
-    radius: 8,
-    visible: true,
-    blendMode: 'NORMAL'
-  }];
+- CARDS MUST HAVE:
+  * White background: fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]
+  * Subtle border: strokes = [{ type: 'SOLID', color: { r: 0.92, g: 0.92, b: 0.94 } }]; strokeWeight = 1;
+  * Rounded corners: cornerRadius = 12;
+  * Drop shadow: effects = [{
+      type: 'DROP_SHADOW',
+      color: { r: 0, g: 0, b: 0, a: 0.06 },
+      offset: { x: 0, y: 2 },
+      radius: 8,
+      visible: true,
+      blendMode: 'NORMAL'
+    }];
+
+- BUTTONS with border (outlined style):
+  * White background: fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]
+  * Border: strokes = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.88 } }]; strokeWeight = 1;
+  * Rounded: cornerRadius = 8;
+
+- NEVER leave cards with only strokes and no fill - they need WHITE fills!
 
 7. TEXT NODES:
 - Set fontName BEFORE characters:
@@ -116,10 +129,14 @@ IMPORTANT: For sizing modes, ONLY use "FIXED" or "AUTO".
   text.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.12 } }];
 
 8. ICONS (Important):
-- For icons, create recognizable placeholder shapes
-- Use rectangles or ellipses with appropriate colors
+- For icons, create CIRCULAR placeholders using ellipse:
+  const icon = figma.createEllipse();
+  icon.resize(20, 20);
+  icon.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.65 } }];
+- For colored icons (like blue), use the accent color
 - Add descriptive names: icon.name = "Icon_Refresh";
-- Match the approximate size of icons in the image
+- Count the exact number of icons in the image and create that many
+- Toolbar icons should be circular or use simple shapes
 
 9. BUTTONS:
 - White background with border for outlined buttons
