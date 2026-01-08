@@ -45,11 +45,11 @@ exports.handler = async (event) => {
           },
           {
             type: 'text',
-            text: `Generate Figma Plugin API code to recreate this UI screenshot exactly.
+            text: `Analyze this UI screenshot and generate Figma Plugin API code that creates the BASIC STRUCTURE.
 
-RULES:
-1. Return ONLY JavaScript code - NO markdown, NO explanations
-2. Use this exact structure:
+Your goal: Create a starting point that the user will manually refine in Figma.
+
+OUTPUT FORMAT - Return ONLY this JavaScript code structure:
 
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
@@ -59,39 +59,34 @@ RULES:
   const component = figma.createComponent();
   component.name = "${componentName || 'GeneratedComponent'}";
   component.resize(${width}, ${height});
-  component.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]; // WHITE background
+  component.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
 
-  // YOUR CODE HERE - recreate all UI elements
+  // Create frames and elements here...
 
   figma.currentPage.appendChild(component);
   figma.currentPage.selection = [component];
   figma.viewport.scrollAndZoomIntoView([component]);
+  console.log("✅ Basic structure created! Adjust colors and spacing in Figma.");
 })();
 
-CRITICAL STYLE RULES:
-- Main background: WHITE { r: 1, g: 1, b: 1 }
-- Cards: WHITE background + border + shadow + cornerRadius: 12
-  card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-  card.strokes = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.92 } }];
-  card.strokeWeight = 1;
-  card.cornerRadius = 12;
-  card.effects = [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.08 }, offset: { x: 0, y: 2 }, radius: 8, visible: true, blendMode: 'NORMAL' }];
+RULES:
+1. NO markdown, NO explanations - ONLY JavaScript code
+2. Focus on STRUCTURE: frames, text nodes, basic shapes
+3. Use simple placeholder colors (white backgrounds, gray borders, dark text)
+4. Use Auto Layout with layoutMode "HORIZONTAL" or "VERTICAL"
+5. ONLY use "FIXED" or "AUTO" for sizing modes (NEVER "FILL_CONTAINER")
+6. Set fontName BEFORE characters for all text nodes
+7. Extract and include ALL text content from the image
+8. Create the correct NUMBER of elements (cards, buttons, icons)
 
-- Buttons with border: WHITE background + gray border + cornerRadius: 8
-- Text: Set fontName BEFORE characters, use DARK color for text
-  text.fontName = { family: "Inter", style: "Medium" };
-  text.characters = "text";
-  text.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1 } }]; // DARK text, NOT blue!
-  
-- Icons: Use figma.createEllipse() for circular icons
-- Sizing: ONLY use "FIXED" or "AUTO" for primaryAxisSizingMode/counterAxisSizingMode (NEVER "FILL_CONTAINER")
+SIMPLE DEFAULTS TO USE:
+- Backgrounds: { r: 1, g: 1, b: 1 } (white)
+- Text: { r: 0.2, g: 0.2, b: 0.2 } (dark gray)
+- Borders: { r: 0.9, g: 0.9, b: 0.9 } (light gray)
+- cornerRadius: 8 or 12
+- Icons: Use figma.createEllipse() as placeholders
 
-Look at the image carefully and match:
-- Exact colors (backgrounds should be WHITE if they look white)
-- TEXT COLOR: Use DARK gray/black { r: 0.1, g: 0.1, b: 0.1 } for text - NEVER use blue for regular text!
-- All text content
-- Layout and spacing
-- Number of elements (cards, icons, buttons)
+The user will adjust exact colors and spacing manually. Focus on getting the structure right.
 
 Generate the code now:`
           }
