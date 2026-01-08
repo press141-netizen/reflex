@@ -698,7 +698,7 @@ const copyToClipboard = async (text) => {
                     <div style={styles.formGroup}>
                       <label style={styles.formLabel}>
                         Screenshot
-                        <span style={styles.formLabelHint}> (Auto-generates Figma code)</span>
+                        <span style={styles.formLabelHint}> (AI generates basic structure - manual adjustment needed)</span>
                       </label>
                       <div
                         style={{
@@ -724,7 +724,7 @@ const copyToClipboard = async (text) => {
                             )}
                             {figmaCode && !isAnalyzing && (
                               <div style={styles.figmaBadge}>
-                                <span>✓</span> Figma code ready
+                                <span>✓</span> Basic structure ready
                               </div>
                             )}
                           </div>
@@ -813,6 +813,7 @@ const copyToClipboard = async (text) => {
                         <h3 style={styles.figmaCodeTitle}>
                           <span style={styles.figmaCodeIcon}>◫</span>
                           Figma Code
+                          <span style={styles.betaTag}>Beta</span>
                         </h3>
                         <button
                           style={{
@@ -824,6 +825,9 @@ const copyToClipboard = async (text) => {
                           {copySuccess ? '✓ Copied!' : 'Copy'}
                         </button>
                       </div>
+                      <div style={styles.figmaCodeNote}>
+                        ⚠️ AI generates basic structure only. Colors, spacing, and details need manual adjustment in Figma.
+                      </div>
                       <div style={styles.figmaCodeBox}>
                         <pre style={styles.figmaCodePre}>{figmaCode}</pre>
                       </div>
@@ -831,6 +835,7 @@ const copyToClipboard = async (text) => {
                         <p><strong>How to use:</strong></p>
                         <p>1. Open Figma → Plugins → Development → Console</p>
                         <p>2. Paste code and press Enter</p>
+                        <p>3. Adjust colors, spacing, fonts manually</p>
                       </div>
                     </div>
                   )}
@@ -1655,6 +1660,24 @@ const copyToClipboard = async (text) => {
         color: '#fff',
         fontSize: '15px',
         fontWeight: '600',
+      },
+      betaTag: {
+        fontSize: '10px',
+        fontWeight: '600',
+        color: '#fbbf24',
+        background: 'rgba(251, 191, 36, 0.2)',
+        padding: '2px 6px',
+        borderRadius: '4px',
+        marginLeft: '4px',
+      },
+      figmaCodeNote: {
+        fontSize: '12px',
+        color: '#fbbf24',
+        background: 'rgba(251, 191, 36, 0.1)',
+        padding: '10px 12px',
+        borderRadius: '8px',
+        marginBottom: '12px',
+        lineHeight: '1.5',
       },
       figmaCodeIcon: {
         color: '#6366f1',
