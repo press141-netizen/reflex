@@ -17,7 +17,15 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { image, componentName } = JSON.parse(event.body);
+    const { image, componentName, mimeType } = JSON.parse(event.body);
+
+    const safeMimeType = (() => {
+      const allowed = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
+      if (!mimeType) return 'image/png';
+      const mt = String(mimeType).toLowerCase();
+      return allowed.has(mt) ? (mt === 'image/jpg' ? 'image/jpeg' : mt) : 'image/png';
+    })();
+
 
     if (!image) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Image is required' }) };
@@ -26,7 +34,12 @@ exports.handler = async (event) => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     
     if (!apiKey) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: 'API key not configured' }) };
+      console.error('ANTHROPIC_API_KEY is not set');
+      return { 
+        statusCode: 500, 
+        headers, 
+        body: JSON.stringify({ error: 'API key not configured' }) 
+      };
     }
 
     const requestBody = JSON.stringify({
@@ -37,11 +50,24 @@ exports.handler = async (event) => {
         content: [
           {
             type: 'image',
-            source: { type: 'base64', media_type: 'image/png', data: image },
+            source: {
+              type: 'base64',
+              media_type: safeMimeType,
+              data: image,
+            },
           },
           {
             type: 'text',
-            text: `Analyze this UI and generate Figma Plugin API code. Return ONLY JavaScript code, no markdown. Start with: const component = figma.createComponent(); Use name: "${componentName || 'GeneratedComponent'}". End with: figma.currentPage.selection = [component]; figma.viewport.scrollAndZoomIntoView([component]); console.log("Done!");`
+            text: `Analyze this UI screenshot and generate Figma Plugin API code to recreate it.
+
+Return ONLY valid JavaScript code, no markdown, no explanations.
+Start with: const component = figma.createComponent();
+Use component name: "${componentName || 'GeneratedComponent'}"
+
+End with:
+figma.currentPage.selection = [component];
+figma.viewport.scrollAndZoomIntoView([component]);
+console.log("✅ Component created!");`
           }
         ],
       }],
@@ -61,24 +87,43 @@ exports.handler = async (event) => {
       }, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
-        res.on('end', () => resolve({ statusCode: res.statusCode, body: JSON.parse(data) }));
+        res.on('end', () => {
+          try {
+            resolve({ statusCode: res.statusCode, body: JSON.parse(data) });
+          } catch (e) {
+            resolve({ statusCode: res.statusCode, body: data });
+          }
+        });
       });
+
       req.on('error', reject);
       req.write(requestBody);
       req.end();
     });
 
     if (apiResponse.statusCode !== 200) {
-      return { statusCode: apiResponse.statusCode, headers, body: JSON.stringify({ error: 'API failed' }) };
+      console.error('API Error:', apiResponse.body);
+      return {
+        statusCode: apiResponse.statusCode,
+        headers,
+        body: JSON.stringify({ error: 'AI API request failed', details: apiResponse.body }),
+      };
     }
+
+    const figmaCode = apiResponse.body.content?.[0]?.text || '';
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true, figmaCode: apiResponse.body.content?.[0]?.text || '' }),
+      body: JSON.stringify({ success: true, figmaCode }),
     };
 
   } catch (error) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
+    console.error('Function error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error', message: error.message }),
+    };
   }
 };
