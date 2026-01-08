@@ -81,10 +81,17 @@ CRITICAL REQUIREMENTS:
 5. LAYOUT STRUCTURE:
 - Use Auto Layout for all containers:
   frame.layoutMode = "HORIZONTAL" or "VERTICAL";
+  frame.primaryAxisSizingMode = "FIXED" or "AUTO"; // ONLY these two values! NEVER use "FILL_CONTAINER"
+  frame.counterAxisSizingMode = "FIXED" or "AUTO"; // ONLY these two values! NEVER use "FILL_CONTAINER"
   frame.primaryAxisAlignItems = "MIN" | "CENTER" | "MAX" | "SPACE_BETWEEN";
   frame.counterAxisAlignItems = "MIN" | "CENTER" | "MAX";
   frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 16;
   frame.itemSpacing = 12;
+  
+IMPORTANT: For sizing modes, ONLY use "FIXED" or "AUTO". 
+- "FIXED" = explicit size set by resize()
+- "AUTO" = size determined by children (hug contents)
+- NEVER use "FILL_CONTAINER" - it will cause an error!
 
 6. BACKGROUNDS & BORDERS:
 - Cards should have WHITE background: fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]
