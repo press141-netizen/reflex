@@ -45,50 +45,102 @@ exports.handler = async (event) => {
           },
           {
             type: 'text',
-            text: `Analyze this UI screenshot and generate Figma Plugin API code that creates the BASIC STRUCTURE.
+            text: `You are a Figma expert. Analyze this UI and generate Figma Plugin API code.
 
-Your goal: Create a starting point that the user will manually refine in Figma.
+STEP 1 - ANALYZE THE LAYOUT:
+- How many columns? (1, 2, 3?)
+- How many rows?
+- What elements are in each cell?
 
-OUTPUT FORMAT - Return ONLY this JavaScript code structure:
+STEP 2 - IDENTIFY ELEMENTS:
+- Headers/titles (text)
+- Buttons (with borders or filled)
+- Input fields
+- Images/icons (use rectangles as placeholders)
+- Labels
+
+STEP 3 - GENERATE CODE:
 
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
-  await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
 
   const component = figma.createComponent();
   component.name = "${componentName || 'GeneratedComponent'}";
   component.resize(${width}, ${height});
   component.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+  component.layoutMode = "VERTICAL";
+  component.paddingTop = component.paddingBottom = component.paddingLeft = component.paddingRight = 16;
+  component.itemSpacing = 12;
+  component.primaryAxisSizingMode = "AUTO";
+  component.counterAxisSizingMode = "FIXED";
 
-  // Create frames and elements here...
+  // === YOUR CODE HERE ===
 
   figma.currentPage.appendChild(component);
   figma.currentPage.selection = [component];
   figma.viewport.scrollAndZoomIntoView([component]);
-  console.log("✅ Basic structure created! Adjust colors and spacing in Figma.");
+  console.log("✅ Done! Adjust in Figma as needed.");
 })();
 
 RULES:
-1. NO markdown, NO explanations - ONLY JavaScript code
-2. Focus on STRUCTURE: frames, text nodes, basic shapes
-3. Use simple placeholder colors (white backgrounds, gray borders, dark text)
-4. Use Auto Layout with layoutMode "HORIZONTAL" or "VERTICAL"
-5. ONLY use "FIXED" or "AUTO" for sizing modes (NEVER "FILL_CONTAINER")
-6. Set fontName BEFORE characters for all text nodes
-7. Extract and include ALL text content from the image
-8. Create the correct NUMBER of elements (cards, buttons, icons)
+1. Return ONLY JavaScript code - NO markdown, NO explanations
+2. Use layoutMode "HORIZONTAL" for rows, "VERTICAL" for columns
+3. ONLY use "FIXED" or "AUTO" for sizing (NEVER "FILL_CONTAINER")
+4. Set fontName BEFORE characters
 
-SIMPLE DEFAULTS TO USE:
-- Backgrounds: { r: 1, g: 1, b: 1 } (white)
-- Text: { r: 0.2, g: 0.2, b: 0.2 } (dark gray)
-- Borders: { r: 0.9, g: 0.9, b: 0.9 } (light gray)
-- cornerRadius: 8 or 12
-- Icons: Use figma.createEllipse() as placeholders
+ELEMENT STYLES:
 
-The user will adjust exact colors and spacing manually. Focus on getting the structure right.
+// Row container (horizontal layout)
+const row = figma.createFrame();
+row.layoutMode = "HORIZONTAL";
+row.itemSpacing = 16;
+row.fills = [];
+row.primaryAxisSizingMode = "AUTO";
+row.counterAxisSizingMode = "AUTO";
 
-Generate the code now:`
+// Text
+const text = figma.createText();
+text.fontName = { family: "Inter", style: "Medium" };
+text.characters = "Label";
+text.fontSize = 14;
+text.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.2 } }];
+
+// Button with border (outlined)
+const btn = figma.createFrame();
+btn.layoutMode = "HORIZONTAL";
+btn.paddingTop = btn.paddingBottom = 8;
+btn.paddingLeft = btn.paddingRight = 16;
+btn.cornerRadius = 4;
+btn.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+btn.strokes = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
+btn.strokeWeight = 1;
+
+// Filled button (like 파일업로드)
+const filledBtn = figma.createFrame();
+filledBtn.layoutMode = "HORIZONTAL";
+filledBtn.paddingTop = filledBtn.paddingBottom = 8;
+filledBtn.paddingLeft = filledBtn.paddingRight = 16;
+filledBtn.cornerRadius = 4;
+filledBtn.fills = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } }];
+
+// Image placeholder
+const imgPlaceholder = figma.createRectangle();
+imgPlaceholder.resize(80, 80);
+imgPlaceholder.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
+imgPlaceholder.cornerRadius = 4;
+
+// Input field
+const input = figma.createFrame();
+input.layoutMode = "HORIZONTAL";
+input.resize(200, 36);
+input.paddingLeft = input.paddingRight = 12;
+input.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+input.strokes = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } }];
+input.strokeWeight = 1;
+input.cornerRadius = 4;
+
+Now analyze the image and generate the code:`
           }
         ],
       }],
