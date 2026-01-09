@@ -1,124 +1,1346 @@
-export const config = {
-  maxDuration: 60,
-};
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reflex - Designer's Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Outfit', sans-serif; background: linear-gradient(180deg, #FAFBFC 0%, #F5F7FA 50%, #EEF2F7 100%); min-height: 100vh; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useMemo, useEffect, useRef } = React;
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const TYPES = [
+      { id: 'all', name: 'All', emoji: '✦' },
+      { id: 'web', name: 'Web', emoji: '◎' },
+      { id: 'mobile', name: 'Mobile', emoji: '◐' },
+      { id: 'graphic', name: 'Graphic', emoji: '◈' },
+      { id: 'component', name: 'Component', emoji: '◫' },
+    ];
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+    const DEFAULT_CATEGORIES = {
+      web: ['Landing', 'Portfolio', 'E-commerce', 'Dashboard', 'Blog', 'Corporate'],
+      mobile: ['iOS', 'Android', 'App', 'Onboarding'],
+      graphic: ['Poster', 'Banner', 'Icon', 'Illustration', 'Logo', 'Print'],
+      component: ['Navigation', 'Hero', 'Button', 'Card', 'Form', 'Modal', 'Sidebar', 'Footer'],
+    };
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    const { image, componentName, mimeType, imageWidth, imageHeight, imageNote, tags } = req.body;
-
-    if (!image) {
-      return res.status(400).json({ error: 'Image is required' });
-    }
-
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    
-    if (!apiKey) {
-      return res.status(500).json({ error: 'API key not configured' });
-    }
-
-    const width = imageWidth || 400;
-    const height = imageHeight || 300;
-    const mime = mimeType || 'image/png';
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+    // 새로운 데이터 구조: images 배열 (각 이미지별 note, figmaCode, isComponent)
+    const DEFAULT_REFERENCES = [
+      {
+        id: 1,
+        type: 'web',
+        title: 'Linear Homepage',
+        url: 'https://linear.app',
+        images: [
+          { id: 'img1', src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop', note: '메인 히어로 섹션', figmaCode: null, isComponent: false },
+        ],
+        category: 'landing',
+        tags: ['minimal', 'dark', 'saas'],
+        addedAt: '2024.12.15 AM 10:30',
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 8000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).
+      {
+        id: 2,
+        type: 'component',
+        title: 'Glass Navigation',
+        url: 'https://vercel.com',
+        images: [
+          { id: 'img2', src: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=400&fit=crop', note: '블러 효과 네비게이션', figmaCode: null, isComponent: false },
+        ],
+        category: 'navigation',
+        tags: ['glassmorphism', 'blur'],
+        addedAt: '2024.12.12',
+      },
+    ];
 
-CONTEXT (user provided):
-- Image note/description: ${imageNote || 'N/A'}
-- Tags: ${(Array.isArray(tags) ? tags.join(', ') : (tags || 'N/A'))}
+    function App() {
+      const [references, setReferences] = useState(() => {
+        const saved = localStorage.getItem('reflex-references-v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            // 구 데이터 마이그레이션
+            return parsed.map(ref => {
+              let next = ref;
+              if (ref.thumbnail && !ref.images) {
+                next = {
+                  ...ref,
+                  images: [{ id: 'migrated', src: ref.thumbnail, note: ref.note || '', figmaCode: ref.figmaCode || null, isComponent: false }],
+                };
+              }
 
-IMPORTANT:
-- Use the context to infer whether this is a button, card, modal, form, etc.
-- If context suggests a modal, create an overlay + centered modal frame.
-- If context suggests a list/grid, reflect that structure.
+              // color 마이그레이션: 단일 값(id/hex) -> colors 배열(hex)
+              if (next.color && !next.colors) {
+                const COLOR_ID_TO_HEX = { red:'#ef4444', orange:'#f97316', yellow:'#eab308', green:'#22c55e', blue:'#3b82f6', purple:'#8b5cf6', pink:'#ec4899', gray:'#6b7280', black:'#1f2937', white:'#f9fafb' };
+                const hex = COLOR_ID_TO_HEX[next.color] || next.color;
+                next = { ...next, colors: [hex], color: undefined };
+              }
+              if (!next.colors) next = { ...next, colors: [] };
 
-RULES:
-- Return ONLY JavaScript code, no markdown
-- Use helpers: txt(), box(), container() as shown below
-- Charts/graphs = single placeholder rectangle
-- Icons = small colored rectangles
-- MUST end with figma.currentPage.appendChild() and figma.viewport.scrollAndZoomIntoView()
-- All frames with fixed size need: primaryAxisSizingMode = "FIXED"; counterAxisSizingMode = "FIXED";
+              return next;
+            });
+          } catch { return DEFAULT_REFERENCES; }
+        }
+        return DEFAULT_REFERENCES;
+      });
+      
+      const [activeType, setActiveType] = useState('all');
+      const [activeCategory, setActiveCategory] = useState('all');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedTags, setSelectedTags] = useState([]);
+      const [selectedRef, setSelectedRef] = useState(null);
+      const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+      const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+      const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+      const [editRef, setEditRef] = useState(null);
+      const [imageZoom, setImageZoom] = useState(null);
+      const [isGenerating, setIsGenerating] = useState(null); // 이미지 ID
+      const [tagInput, setTagInput] = useState('');
+      const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+      const [categoryInput, setCategoryInput] = useState('');
+      const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+      const addTagInputRef = useRef(null);
+      const addCategoryInputRef = useRef(null);
+      const editTagInputRef = useRef(null);
+      const editCategoryInputRef = useRef(null);
+      
+      // 드롭다운 닫기 - blur 이벤트 사용 (모달과 충돌 방지)
+      const closeSuggestionsOnBlur = (wrapperRef, setOpen) => {
+        setTimeout(() => {
+          if (!wrapperRef.current?.contains(document.activeElement)) {
+            setOpen(false);
+          }
+        }, 150);
+      };
+      
+      const [newRef, setNewRef] = useState({
+        type: 'web',
+        title: '',
+        url: '',
+        images: [],
+        category: 'Landing',
+        tags: [],
+        colors: [], // hex list
+      });
+      const [colorHexInput, setColorHexInput] = useState('');
+      const [editColorHexInput, setEditColorHexInput] = useState('');
 
-START CODE:
-(async () => {
-  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-  await figma.loadFontAsync({ family: "Inter", style: "Medium" });
-  await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
-  
-  const txt = (p, s, sz, c, st = "Regular") => { const t = figma.createText(); t.fontName = { family: "Inter", style: st }; t.characters = s; t.fontSize = sz; t.fills = [{ type: 'SOLID', color: c }]; p.appendChild(t); return t; };
-  const box = (p, w, h, c, r = 0) => { const b = figma.createRectangle(); b.resize(w, h); b.fills = [{ type: 'SOLID', color: c }]; b.cornerRadius = r; p.appendChild(b); return b; };
-  const row = (p, gap) => { const f = figma.createFrame(); f.layoutMode = "HORIZONTAL"; f.itemSpacing = gap; f.fills = []; f.counterAxisAlignItems = "CENTER"; f.primaryAxisSizingMode = "AUTO"; f.counterAxisSizingMode = "AUTO"; if(p) p.appendChild(f); return f; };
-  const col = (p, gap) => { const f = figma.createFrame(); f.layoutMode = "VERTICAL"; f.itemSpacing = gap; f.fills = []; f.primaryAxisSizingMode = "AUTO"; f.counterAxisSizingMode = "AUTO"; if(p) p.appendChild(f); return f; };
-  
-  const frame = figma.createFrame();
-  frame.name = "${componentName || 'Component'}";
-  frame.resize(${width}, ${height});
-  frame.layoutMode = "VERTICAL";
-  frame.primaryAxisSizingMode = "FIXED";
-  frame.counterAxisSizingMode = "FIXED";
-  // Continue building UI...
-  
-  figma.currentPage.appendChild(frame);
-  figma.viewport.scrollAndZoomIntoView([frame]);
-})();
+      // 컬러 옵션
+      const COLOR_OPTIONS = [
+        { id: 'red', color: '#ef4444' },
+        { id: 'orange', color: '#f97316' },
+        { id: 'yellow', color: '#eab308' },
+        { id: 'green', color: '#22c55e' },
+        { id: 'blue', color: '#3b82f6' },
+        { id: 'purple', color: '#8b5cf6' },
+        { id: 'pink', color: '#ec4899' },
+        { id: 'gray', color: '#6b7280' },
+        { id: 'black', color: '#1f2937' },
+        { id: 'white', color: '#f9fafb' },
+      ];
 
-Analyze the image and complete the code. Keep it concise but complete.` }
-          ],
-        }],
-      }),
-    });
+      // Save to localStorage
+      useEffect(() => {
+        localStorage.setItem('reflex-references-v2', JSON.stringify(references));
+      }, [references]);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ error: 'API failed', details: errorData });
+      // 전체 태그 목록
+      const allTags = useMemo(() => {
+        const tags = new Set();
+        references.forEach(ref => ref.tags?.forEach(tag => tags.add(tag)));
+        return Array.from(tags).sort();
+      }, [references]);
+
+      // 커스텀 카테고리 (localStorage에서 로드)
+      const [customCategories, setCustomCategories] = useState(() => {
+        const saved = localStorage.getItem('reflex-custom-categories');
+        return saved ? JSON.parse(saved) : { web: [], mobile: [], graphic: [], component: [] };
+      });
+
+      // 커스텀 카테고리 저장
+      useEffect(() => {
+        localStorage.setItem('reflex-custom-categories', JSON.stringify(customCategories));
+      }, [customCategories]);
+
+      // 전체 카테고리 (기본 + 커스텀)
+      const allCategories = useMemo(() => {
+        const result = {};
+        Object.keys(DEFAULT_CATEGORIES).forEach(type => {
+          result[type] = [...DEFAULT_CATEGORIES[type], ...(customCategories[type] || [])];
+        });
+        return result;
+      }, [customCategories]);
+
+      // 필터링 (검색에 note 포함)
+      const filteredReferences = useMemo(() => {
+        return references.filter(ref => {
+          if (activeType !== 'all' && ref.type !== activeType) return false;
+          if (activeCategory !== 'all' && ref.category !== activeCategory) return false;
+          if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            const titleMatch = ref.title.toLowerCase().includes(q);
+            const tagMatch = ref.tags?.some(t => t.toLowerCase().includes(q));
+            const noteMatch = ref.images?.some(img => img.note?.toLowerCase().includes(q));
+            if (!titleMatch && !tagMatch && !noteMatch) return false;
+          }
+          if (selectedTags.length > 0 && !selectedTags.every(t => ref.tags?.includes(t))) return false;
+          return true;
+        });
+      }, [references, activeType, activeCategory, searchQuery, selectedTags]);
+
+      // 브라우저에서 자동 리사이징 + JPEG 압축(품질 70%) 후 dataURL로 저장
+      const compressImageToJpegDataUrl = (file, quality = 0.7, maxDim = 2000) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error('File read failed'));
+          reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Image load failed'));
+            img.onload = () => {
+              const w = img.naturalWidth || img.width;
+              const h = img.naturalHeight || img.height;
+              const scale = Math.min(1, maxDim / Math.max(w, h));
+              const tw = Math.max(1, Math.round(w * scale));
+              const th = Math.max(1, Math.round(h * scale));
+
+              const canvas = document.createElement('canvas');
+              canvas.width = tw;
+              canvas.height = th;
+              const ctx = canvas.getContext('2d');
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(img, 0, 0, tw, th);
+
+              const dataUrl = canvas.toDataURL('image/jpeg', quality);
+              resolve({ dataUrl, width: tw, height: th });
+            };
+            img.src = reader.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      };
+
+      // 이미지 업로드 핸들러 (압축 적용)
+      const handleImageUpload = async (e, isEdit = false) => {
+        const files = Array.from(e.target.files || []);
+        for (const file of files) {
+          if (!file.type.startsWith('image/')) continue;
+          try {
+            const { dataUrl } = await compressImageToJpegDataUrl(file, 0.7, 2000);
+            const newImage = {
+              id: Date.now() + Math.random().toString(36).substr(2, 9),
+              src: dataUrl,
+              note: '',
+              figmaCode: null,
+              isComponent: false,
+            };
+            if (isEdit && editRef) {
+              setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
+            } else {
+              setNewRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
+            }
+          } catch (err) {
+            console.error('이미지 처리 실패:', err);
+          }
+        }
+        // 같은 파일을 다시 선택할 수 있도록 reset
+        e.target.value = '';
+      };
+              if (isEdit && editRef) {
+                setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
+              } else {
+                setNewRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      };
+
+      // 이미지 삭제
+      const handleRemoveImage = (imgId, isEdit = false) => {
+        if (isEdit) {
+          setEditRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
+        } else {
+          setNewRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
+        }
+      };
+
+      // 이미지 노트 수정
+      const handleImageNoteChange = (imgId, note, isEdit = false) => {
+        if (isEdit) {
+          setEditRef(prev => ({
+            ...prev,
+            images: prev.images.map(img => img.id === imgId ? { ...img, note } : img)
+          }));
+        } else {
+          setNewRef(prev => ({
+            ...prev,
+            images: prev.images.map(img => img.id === imgId ? { ...img, note } : img)
+          }));
+        }
+      };
+
+      // 태그 추가
+      const handleAddTag = (tag, isEdit = false) => {
+        const trimmed = tag.trim().toLowerCase();
+        if (!trimmed) return;
+        if (isEdit) {
+          if (!editRef.tags.includes(trimmed)) {
+            setEditRef(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
+          }
+        } else {
+          if (!newRef.tags.includes(trimmed)) {
+            setNewRef(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
+          }
+        }
+        setTagInput('');
+        setShowTagSuggestions(false);
+      };
+
+      // 태그 제거
+      const handleRemoveTag = (tag, isEdit = false) => {
+        if (isEdit) {
+          setEditRef(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+        } else {
+          setNewRef(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+        }
+      };
+
+      // 태그 제안 필터
+      const filteredTagSuggestions = useMemo(() => {
+        if (!tagInput) return allTags.slice(0, 10);
+        return allTags.filter(t => t.includes(tagInput.toLowerCase())).slice(0, 10);
+      }, [tagInput, allTags]);
+
+      // 카테고리 추가
+      const handleAddCategory = (type, category) => {
+        const trimmed = category.trim();
+        if (!trimmed) return;
+        if (!allCategories[type]?.includes(trimmed)) {
+          setCustomCategories(prev => ({
+            ...prev,
+            [type]: [...(prev[type] || []), trimmed]
+          }));
+        }
+        setCategoryInput('');
+        setShowCategorySuggestions(false);
+      };
+
+      // 날짜 포맷 함수
+      const formatDateTime = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = now.getHours();
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const hour12 = String(hours % 12 || 12).padStart(2, '0');
+        return `${year}.${month}.${day} ${ampm} ${hour12}:${minutes}`;
+      };
+
+      // 이미지 컴포넌트 체크 토글
+      const handleToggleComponent = (imgId, isEdit = false) => {
+        if (isEdit) {
+          setEditRef(prev => ({
+            ...prev,
+            images: prev.images.map(img => 
+              img.id === imgId ? { ...img, isComponent: !img.isComponent } : img
+            )
+          }));
+        } else {
+          setNewRef(prev => ({
+            ...prev,
+            images: prev.images.map(img => 
+              img.id === imgId ? { ...img, isComponent: !img.isComponent } : img
+            )
+          }));
+        }
+      };
+
+      // 레퍼런스 추가 (컴포넌트 자동 생성 포함)
+      const handleAddReference = () => {
+        if (!newRef.title || newRef.images.length === 0) {
+          alert('제목과 최소 1개의 이미지가 필요합니다.');
+          return;
+        }
+        
+        const addedAt = formatDateTime();
+        const reference = {
+          id: Date.now(),
+          ...newRef,
+          addedAt,
+        };
+        
+        // 컴포넌트로 체크된 이미지들 자동 추가
+        const componentImages = newRef.images.filter(img => img.isComponent);
+        const componentRefs = componentImages.map((img, idx) => ({
+          id: Date.now() + idx + 1,
+          type: 'component',
+          title: `${newRef.title} - Component`,
+          url: newRef.url,
+          images: [{ ...img, isComponent: false }],
+          category: 'card',
+          tags: [...newRef.tags],
+          addedAt,
+          sourceRefId: reference.id, // 원본 참조
+        }));
+        
+        setReferences(prev => [reference, ...componentRefs, ...prev]);
+        setIsAddModalOpen(false);
+        setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [], colors: [] });
+        setColorHexInput('');
+      };
+
+      // 레퍼런스 수정 저장
+      const handleSaveEdit = () => {
+        if (!editRef.title) return;
+        setReferences(prev => prev.map(ref => ref.id === editRef.id ? editRef : ref));
+        setSelectedRef(editRef);
+        setIsEditModalOpen(false);
+      };
+
+      // 레퍼런스 삭제
+      const handleDeleteReference = (id) => {
+        setReferences(prev => prev.filter(ref => ref.id !== id));
+        setSelectedRef(null);
+      };
+
+      // Figma 코드 생성 (특정 이미지)
+      const handleGenerateFigma = async (refId, imgId) => {
+        const ref = references.find(r => r.id === refId);
+        const img = ref?.images.find(i => i.id === imgId);
+        if (!img) return;
+
+        setIsGenerating(imgId);
+        
+        try {
+          let base64Data = img.src;
+          let mimeType = 'image/png';
+          
+          if (img.src.startsWith('data:')) {
+            const [header, data] = img.src.split(',');
+            mimeType = header.match(/data:(.*?);/)?.[1] || 'image/png';
+            base64Data = data;
+          } else {
+            // URL인 경우 fetch
+            const response = await fetch(img.src);
+            const blob = await response.blob();
+            mimeType = blob.type;
+            base64Data = await new Promise(resolve => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result.split(',')[1]);
+              reader.readAsDataURL(blob);
+            });
+          }
+
+          // 이미지 크기
+          const imgEl = new Image();
+          imgEl.src = img.src;
+          await new Promise(resolve => { imgEl.onload = resolve; });
+
+          const apiResponse = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64Data,
+              mimeType,
+              componentName: ref.title,
+              imageWidth: imgEl.naturalWidth,
+              imageHeight: imgEl.naturalHeight,
+              imageNote: img.note || '',
+              tags: ref.tags || [],
+            }),
+          });
+
+          if (!apiResponse.ok) throw new Error('API failed');
+          
+          const result = await apiResponse.json();
+          
+          if (result.figmaCode) {
+            setReferences(prev => prev.map(r => {
+              if (r.id !== refId) return r;
+              return {
+                ...r,
+                images: r.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
+              };
+            }));
+            // 현재 선택된 ref 업데이트
+            if (selectedRef?.id === refId) {
+              setSelectedRef(prev => ({
+                ...prev,
+                images: prev.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('Figma 생성 실패:', error);
+          alert('Figma 코드 생성에 실패했습니다.');
+        } finally {
+          setIsGenerating(null);
+        }
+      };
+
+      // 클립보드 복사 (피드백 포함)
+      const [copySuccess, setCopySuccess] = useState(false);
+      const copyToClipboard = (code) => {
+        navigator.clipboard.writeText(code);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      };
+
+      // 태그 토글 (다중 선택)
+      const toggleTag = (tag) => {
+        setSelectedTags(prev => 
+          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+        );
+      };
+
+      return (
+        <div style={styles.container}>
+          {/* Header */}
+          <header style={styles.header}>
+            <div style={styles.headerInner}>
+              <div style={styles.logo}>
+                <span style={styles.logoIcon}>◈</span>
+                <span style={styles.logoText}>Reflex</span>
+              </div>
+              <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)}>
+                + Add Reference
+              </button>
+            </div>
+          </header>
+
+          {/* Filters */}
+          <section style={styles.filterSection}>
+            <div style={styles.typeToggle}>
+              {TYPES.map(type => (
+                <button
+                  key={type.id}
+                  onClick={() => { setActiveType(type.id); setActiveCategory('all'); }}
+                  style={{ ...styles.typeButton, ...(activeType === type.id ? styles.typeButtonActive : {}) }}
+                >
+                  {type.emoji} {type.name}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder="Search title, tags, description..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={styles.searchInput}
+            />
+          </section>
+
+          {/* Category Filter */}
+          {activeType !== 'all' && (
+            <div style={styles.categoryFilterSection}>
+              <span style={styles.filterLabel}>Category</span>
+              <div style={styles.categoryFilter}>
+                <button
+                  onClick={() => setActiveCategory('all')}
+                  style={{ ...styles.catButton, ...(activeCategory === 'all' ? styles.catButtonActive : {}) }}
+                >
+                  All
+                </button>
+                {allCategories[activeType]?.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    style={{ ...styles.catButton, ...(activeCategory === cat ? styles.catButtonActive : {}) }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tag Filter */}
+          {allTags.length > 0 && (
+            <div style={styles.tagFilterSection}>
+              <span style={styles.filterLabel}>Tags</span>
+              <div style={styles.tagFilterList}>
+                {allTags.slice(0, 15).map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    style={{ 
+                      ...styles.tagFilterBtn, 
+                      ...(selectedTags.includes(tag) ? styles.tagFilterBtnActive : {}) 
+                    }}
+                  >
+                    {tag}
+                  </button>
+                ))}
+                {selectedTags.length > 0 && (
+                  <button style={styles.clearTagsBtn} onClick={() => setSelectedTags([])}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Grid */}
+          <main style={styles.grid}>
+            {filteredReferences.map(ref => (
+              <article key={ref.id} style={styles.card} onClick={() => { setSelectedRef(ref); setSelectedImageIndex(0); }}>
+                <div style={styles.cardImageWrapper}>
+                  <img src={ref.images[0]?.src} alt={ref.title} style={styles.cardImage} />
+                  {ref.images.length > 1 && (
+                    <span style={styles.imageCount}>+{ref.images.length - 1}</span>
+                  )}
+                  {ref.images.some(img => img.figmaCode) && (
+                    <span style={styles.figmaBadge}>◫</span>
+                  )}
+                </div>
+                <div style={styles.cardContent}>
+                  <h3 style={styles.cardTitle}>{ref.title}</h3>
+                  <div style={styles.cardTags}>
+                    {ref.tags?.slice(0, 3).map(tag => (
+                      <span key={tag} style={styles.cardTag}>{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </main>
+
+          {/* Detail Modal */}
+          {selectedRef && (
+            <div style={styles.modalOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedRef(null); }}>
+              <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
+                
+                {/* 이미지 갤러리 */}
+                <div style={styles.imageGallery}>
+                  <img
+                    src={selectedRef.images[selectedImageIndex]?.src}
+                    alt=""
+                    style={styles.modalImage}
+                    onClick={() => setImageZoom(selectedRef.images[selectedImageIndex]?.src)}
+                  />
+                  {selectedRef.images.length > 1 && (
+                    <div style={styles.imageThumbs}>
+                      {selectedRef.images.map((img, idx) => (
+                        <img
+                          key={img.id}
+                          src={img.src}
+                          alt=""
+                          style={{ ...styles.thumbImg, ...(idx === selectedImageIndex ? styles.thumbImgActive : {}) }}
+                          onClick={() => setSelectedImageIndex(idx)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={styles.modalContent}>
+                  <div style={styles.modalMeta}>
+                    <span style={styles.modalType}>{TYPES.find(t => t.id === selectedRef.type)?.emoji} {selectedRef.type}</span>
+                    <span>•</span>
+                    <span>{selectedRef.category}</span>
+                  </div>
+                  <h2 style={styles.modalTitle}>{selectedRef.title}</h2>
+                  {selectedRef.url && (
+                    <a href={selectedRef.url} target="_blank" style={styles.modalUrl}>{selectedRef.url} ↗</a>
+                  )}
+                  
+                  {/* 현재 이미지 노트 */}
+                  {selectedRef.images[selectedImageIndex]?.note && (
+                    <p style={styles.modalNote}>{selectedRef.images[selectedImageIndex].note}</p>
+                  )}
+
+                  {/* 태그 */}
+                  <div style={styles.modalTags}>
+                    {selectedRef.tags?.map(tag => (
+                      <span key={tag} style={styles.modalTag}>{tag}</span>
+                    ))}
+                  </div>
+
+                  {/* Figma 코드 생성/표시 */}
+                  <div style={styles.figmaSection}>
+                    {selectedRef.images[selectedImageIndex]?.figmaCode ? (
+                      <>
+                        <div style={styles.figmaHeader}>
+                          <span>◫ Figma Code</span>
+                          <button
+                            style={{ ...styles.copyBtn, ...(copySuccess ? styles.copyBtnSuccess : {}) }}
+                            onClick={() => copyToClipboard(selectedRef.images[selectedImageIndex].figmaCode)}
+                          >
+                            {copySuccess ? '✓ Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                        <pre style={styles.figmaCode}>
+                          {selectedRef.images[selectedImageIndex].figmaCode}
+                        </pre>
+                        <div style={styles.figmaMemo}>
+                          <strong>비고</strong> — Figma에서 <em>Plugins → Development → Import plugin from manifest…</em>로 플러그인 추가 후,
+                          생성된 코드 전체를 붙여넣고 실행하세요.
+                        </div>
+                      </>
+                    ) : (
+                      <button
+                        style={{ ...styles.generateBtn, ...(isGenerating ? styles.generateBtnDisabled : {}) }}
+                        onClick={() => handleGenerateFigma(selectedRef.id, selectedRef.images[selectedImageIndex].id)}
+                        disabled={isGenerating}
+                      >
+                        {isGenerating === selectedRef.images[selectedImageIndex]?.id ? (
+                          <><span style={styles.spinner}></span> Generating...</>
+                        ) : (
+                          '◫ Generate Figma Code'
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={styles.modalFooter}>
+                    <span>{selectedRef.addedAt}</span>
+                    <div style={styles.modalActions}>
+                      <button style={styles.editBtn} onClick={() => { setEditRef({...selectedRef}); setIsEditModalOpen(true); }}>
+                        ✎ Edit
+                      </button>
+                      <button style={styles.deleteBtn} onClick={() => handleDeleteReference(selectedRef.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Modal */}
+          {isAddModalOpen && (
+            <div style={styles.modalOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setIsAddModalOpen(false); }}>
+              <div style={styles.addModal} onClick={e => e.stopPropagation()}>
+                <button style={styles.modalClose} onClick={() => setIsAddModalOpen(false)}>✕</button>
+                <h2 style={styles.modalTitle}>Add New Reference</h2>
+
+                {/* Type */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Type</label>
+                  <div style={styles.typeToggle}>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'web' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'web', category: 'Landing' }))}
+                    >
+                      ◎ Web
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'mobile', category: 'iOS' }))}
+                    >
+                      ◐ Mobile
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'graphic' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'graphic', category: 'Poster' }))}
+                    >
+                      ◈ Graphic
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'component' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'component', category: 'Navigation' }))}
+                    >
+                      ◫ Component
+                    </button>
+                  </div>
+                </div>
+
+                {/* Images */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    Images {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') ? '(여러 장 가능)' : '(1장)'}
+                  </label>
+                  <div style={styles.imageUploadArea}>
+                    {newRef.images.map(img => (
+                      <div key={img.id} style={styles.uploadedImage}>
+                        <img src={img.src} alt="" style={styles.uploadedThumb} />
+                        <button style={styles.removeImgBtn} onClick={() => handleRemoveImage(img.id)}>✕</button>
+                        <textarea
+                          placeholder="이미지 설명..."
+                          value={img.note}
+                          onChange={e => handleImageNoteChange(img.id, e.target.value)}
+                          style={styles.imgNoteInput}
+                        />
+                        {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') && (
+                          <label style={styles.componentCheckbox}>
+                            <input
+                              type="checkbox"
+                              checked={img.isComponent || false}
+                              onChange={() => handleToggleComponent(img.id)}
+                            />
+                            <span>Component로 추가</span>
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                    {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic' || newRef.images.length === 0) && (
+                      <label style={styles.addImageBtn}>
+                        + Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple={newRef.type !== 'component'}
+                          onChange={e => handleImageUpload(e)}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Title *</label>
+                  <input
+                    type="text"
+                    value={newRef.title}
+                    onChange={e => setNewRef(p => ({ ...p, title: e.target.value }))}
+                    style={styles.input}
+                    placeholder="e.g., Linear Homepage"
+                  />
+                </div>
+
+                {/* URL */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>URL</label>
+                  <input
+                    type="url"
+                    value={newRef.url}
+                    onChange={e => setNewRef(p => ({ ...p, url: e.target.value }))}
+                    style={styles.input}
+                    placeholder="https://example.com"
+                  />
+                </div>
+
+                {/* Category */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Category</label>
+                  <div style={styles.categoryInputWrapper} ref={addCategoryInputRef}>
+                    <input
+                      type="text"
+                      value={newRef.category}
+                      onChange={e => { setNewRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
+                      onFocus={() => setShowCategorySuggestions(true)}
+                      onBlur={() => closeSuggestionsOnBlur(addCategoryInputRef, setShowCategorySuggestions)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(newRef.type, newRef.category); } }}
+                      style={styles.input}
+                      placeholder="카테고리 선택 또는 입력"
+                    />
+                    {showCategorySuggestions && allCategories[newRef.type]?.length > 0 && (
+                      <div style={styles.categorySuggestions}>
+                        {allCategories[newRef.type]
+                          .filter(cat => cat.toLowerCase().includes(newRef.category.toLowerCase()))
+                          .map(cat => (
+                            <button 
+                              key={cat} 
+                              style={styles.categorySuggestion}
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => { setNewRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        {newRef.category && !allCategories[newRef.type]?.includes(newRef.category) && (
+                          <button 
+                            style={styles.categorySuggestionNew}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => handleAddCategory(newRef.type, newRef.category)}
+                          >
+                            + "{newRef.category}" 추가
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Tags</label>
+                  <div style={styles.tagsContainer}>
+                    {newRef.tags.map(tag => (
+                      <span key={tag} style={styles.tagChip}>
+                        {tag}
+                        <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={styles.tagInputWrapper} ref={addTagInputRef}>
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                      onFocus={() => setShowTagSuggestions(true)}
+                      onBlur={() => closeSuggestionsOnBlur(editTagInputRef, setShowTagSuggestions)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput); } }}
+                      style={styles.input}
+                      placeholder="태그 입력 후 Enter"
+                    />
+                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                      <div style={styles.tagSuggestions}>
+                        {filteredTagSuggestions.map(tag => (
+                          <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag)}>
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Color */} 
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Color (multi)</label>
+                  <div style={styles.colorPicker}>
+                    {COLOR_OPTIONS.map(c => {
+                      const active = (newRef.colors || []).includes(c.color);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          title={c.color}
+                          style={{
+                            ...styles.colorBtn,
+                            backgroundColor: c.color,
+                            ...(active ? styles.colorBtnActive : {})
+                          }}
+                          onClick={() =>
+                            setNewRef(p => {
+                              const cur = p.colors || [];
+                              return active
+                                ? { ...p, colors: cur.filter(x => x !== c.color) }
+                                : { ...p, colors: [...cur, c.color] };
+                            })
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <div style={styles.colorHexRow}>
+                    <input
+                      type="text"
+                      value={colorHexInput}
+                      onChange={e => setColorHexInput(e.target.value)}
+                      placeholder="#RRGGBB (직접 추가)"
+                      style={styles.input}
+                    />
+                    <button
+                      type="button"
+                      style={styles.colorHexAddBtn}
+                      onClick={() => {
+                        const v = (colorHexInput || '').trim();
+                        const hex = v.startsWith('#') ? v : `#${v}`;
+                        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+                        setNewRef(p => ({ ...p, colors: [...(p.colors || []), hex] }));
+                        setColorHexInput('');
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  {newRef.colors?.length > 0 && (
+                    <div style={styles.tagsContainer}>
+                      {newRef.colors.map((hex, idx) => (
+                        <span key={hex + idx} style={{ ...styles.tagChip, color: '#334155' }}>
+                          <span style={{ ...styles.colorDot, backgroundColor: hex }} />
+                          {hex}
+                          <button
+                            type="button"
+                            style={styles.tagRemove}
+                            onClick={() => setNewRef(p => ({ ...p, colors: p.colors.filter((_, i) => i !== idx) }))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button style={styles.submitBtn} onClick={handleAddReference}>
+                  Add Reference
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Modal */}
+          {isEditModalOpen && editRef && (
+            <div style={styles.modalOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setIsEditModalOpen(false); }}>
+              <div style={styles.addModal} onClick={e => e.stopPropagation()}>
+                <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
+                <h2 style={styles.modalTitle}>Edit Reference</h2>
+
+                {/* Type */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Type</label>
+                  <div style={styles.typeToggle}>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'web' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'web' }))}
+                    >
+                      ◎ Web
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'mobile' }))}
+                    >
+                      ◐ Mobile
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'graphic' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'graphic' }))}
+                    >
+                      ◈ Graphic
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'component' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'component' }))}
+                    >
+                      ◫ Component
+                    </button>
+                  </div>
+                </div>
+
+                {/* Images */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Images</label>
+                  <div style={styles.imageUploadArea}>
+                    {editRef.images.map(img => (
+                      <div key={img.id} style={styles.uploadedImage}>
+                        <img src={img.src} alt="" style={styles.uploadedThumb} />
+                        <button style={styles.removeImgBtn} onClick={() => handleRemoveImage(img.id, true)}>✕</button>
+                        <textarea
+                          placeholder="이미지 설명..."
+                          value={img.note}
+                          onChange={e => handleImageNoteChange(img.id, e.target.value, true)}
+                          style={styles.imgNoteInput}
+                        />
+                        {editRef.type !== 'component' && (
+                          <label style={styles.componentCheckbox}>
+                            <input
+                              type="checkbox"
+                              checked={img.isComponent || false}
+                              onChange={() => handleToggleComponent(img.id, true)}
+                            />
+                            <span>Component로 추가</span>
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                    {(editRef.type !== 'component' || editRef.images.length === 0) && (
+                      <label style={styles.addImageBtn}>
+                        + Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple={editRef.type !== 'component'}
+                          onChange={e => handleImageUpload(e, true)}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Title *</label>
+                  <input
+                    type="text"
+                    value={editRef.title}
+                    onChange={e => setEditRef(p => ({ ...p, title: e.target.value }))}
+                    style={styles.input}
+                  />
+                </div>
+
+                {/* URL */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>URL</label>
+                  <input
+                    type="url"
+                    value={editRef.url || ''}
+                    onChange={e => setEditRef(p => ({ ...p, url: e.target.value }))}
+                    style={styles.input}
+                  />
+                </div>
+
+                {/* Category */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Category</label>
+                  <div style={styles.categoryInputWrapper} ref={editCategoryInputRef}>
+                    <input
+                      type="text"
+                      value={editRef.category}
+                      onChange={e => { setEditRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
+                      onFocus={() => setShowCategorySuggestions(true)}
+                      onBlur={() => closeSuggestionsOnBlur(editCategoryInputRef, setShowCategorySuggestions)}
+                      style={styles.input}
+                      placeholder="카테고리 선택 또는 입력"
+                    />
+                    {showCategorySuggestions && allCategories[editRef.type]?.length > 0 && (
+                      <div style={styles.categorySuggestions}>
+                        {allCategories[editRef.type]
+                          .filter(cat => cat.toLowerCase().includes((editRef.category || '').toLowerCase()))
+                          .map(cat => (
+                            <button 
+                              key={cat} 
+                              style={styles.categorySuggestion} 
+                              onClick={() => { setEditRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Tags</label>
+                  <div style={styles.tagsContainer}>
+                    {editRef.tags?.map(tag => (
+                      <span key={tag} style={styles.tagChip}>
+                        {tag}
+                        <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag, true)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={styles.tagInputWrapper} ref={editTagInputRef}>
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                      onFocus={() => setShowTagSuggestions(true)}
+                      onBlur={() => closeSuggestionsOnBlur(addTagInputRef, setShowTagSuggestions)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput, true); } }}
+                      style={styles.input}
+                      placeholder="태그 입력 후 Enter"
+                    />
+                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                      <div style={styles.tagSuggestions}>
+                        {filteredTagSuggestions.map(tag => (
+                          <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag, true)}>
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Color */} 
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Color (multi)</label>
+                  <div style={styles.colorPicker}>
+                    {COLOR_OPTIONS.map(c => {
+                      const active = (editRef.colors || []).includes(c.color);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          title={c.color}
+                          style={{
+                            ...styles.colorBtn,
+                            backgroundColor: c.color,
+                            ...(active ? styles.colorBtnActive : {})
+                          }}
+                          onClick={() =>
+                            setEditRef(p => {
+                              const cur = p.colors || [];
+                              return active
+                                ? { ...p, colors: cur.filter(x => x !== c.color) }
+                                : { ...p, colors: [...cur, c.color] };
+                            })
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <div style={styles.colorHexRow}>
+                    <input
+                      type="text"
+                      value={editColorHexInput}
+                      onChange={e => setEditColorHexInput(e.target.value)}
+                      placeholder="#RRGGBB (직접 추가)"
+                      style={styles.input}
+                    />
+                    <button
+                      type="button"
+                      style={styles.colorHexAddBtn}
+                      onClick={() => {
+                        const v = (editColorHexInput || '').trim();
+                        const hex = v.startsWith('#') ? v : `#${v}`;
+                        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+                        setEditRef(p => ({ ...p, colors: [...(p.colors || []), hex] }));
+                        setEditColorHexInput('');
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  {editRef.colors?.length > 0 && (
+                    <div style={styles.tagsContainer}>
+                      {editRef.colors.map((hex, idx) => (
+                        <span key={hex + idx} style={{ ...styles.tagChip, color: '#334155' }}>
+                          <span style={{ ...styles.colorDot, backgroundColor: hex }} />
+                          {hex}
+                          <button
+                            type="button"
+                            style={styles.tagRemove}
+                            onClick={() => setEditRef(p => ({ ...p, colors: p.colors.filter((_, i) => i !== idx) }))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+<div style={styles.editBtns}>
+                  <button style={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>Cancel</button>
+                  <button style={styles.submitBtn} onClick={handleSaveEdit}>Save Changes</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Image Zoom */}
+          {imageZoom && (
+            <div style={styles.zoomOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setImageZoom(null); }}>
+              <img src={imageZoom} alt="" style={styles.zoomImage} />
+            </div>
+          )}
+        </div>
+      );
     }
 
-    const data = await response.json();
-    let code = data.content?.[0]?.text || '';
-    
-    // Clean up markdown formatting
-    code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
-    
-    // Validate code completeness
-    if (!code.includes('figma.currentPage.appendChild') || !code.includes('figma.viewport.scrollAndZoomIntoView')) {
-      // Try to fix incomplete code
-      if (!code.includes('figma.currentPage.appendChild')) {
-        code = code.replace(/\}\)\(\);?\s*$/, `
-  figma.currentPage.appendChild(frame);
-  figma.viewport.scrollAndZoomIntoView([frame]);
-})();`);
-      }
-    }
+    const styles = {
+      container: { minHeight: '100vh', padding: '20px' },
+      header: { maxWidth: '1400px', margin: '0 auto 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+      headerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+      logo: { display: 'flex', alignItems: 'center', gap: '8px' },
+      logoIcon: { fontSize: '28px', color: '#6366f1' },
+      logoText: { fontSize: '24px', fontWeight: '700', fontFamily: '"Space Grotesk", sans-serif' },
+      addButton: { padding: '10px 20px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      filterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' },
+      typeToggle: { display: 'flex', gap: '8px' },
+      typeButton: { padding: '8px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif', fontSize: '14px' },
+      typeButtonActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
+      searchInput: { padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', width: '200px', fontFamily: '"Outfit", sans-serif' },
+      categoryFilter: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      catButton: { padding: '6px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      catButtonActive: { background: '#f0f0ff', borderColor: '#6366f1', color: '#6366f1' },
+      grid: { maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
+      card: { background: '#fff', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', transition: 'transform 0.2s, box-shadow 0.2s' },
+      cardImageWrapper: { position: 'relative', aspectRatio: '16/10', overflow: 'hidden' },
+      cardImage: { width: '100%', height: '100%', objectFit: 'cover' },
+      imageCount: { position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' },
+      figmaBadge: { position: 'absolute', bottom: '8px', right: '8px', background: '#6366f1', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' },
+      cardContent: { padding: '16px' },
+      cardTitle: { fontSize: '16px', fontWeight: '600', marginBottom: '8px', fontFamily: '"Space Grotesk", sans-serif' },
+      cardTags: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
+      cardTag: { fontSize: '12px', color: '#6366f1', background: '#f0f0ff', padding: '4px 12px', borderRadius: '6px', border: '1px solid #e0e7ff' },
+      modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
+      modal: { background: '#fff', borderRadius: '20px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflow: 'auto', position: 'relative' },
+      addModal: { background: '#fff', borderRadius: '20px', maxWidth: '760px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '30px', position: 'relative' },
+      modalClose: { position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', background: '#f5f5f5', border: 'none', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', zIndex: 10 },
+      imageGallery: { position: 'relative' },
+      modalImage: { width: '100%', maxHeight: '400px', objectFit: 'contain', background: '#f5f5f5', cursor: 'zoom-in' },
+      imageThumbs: { display: 'flex', gap: '8px', padding: '12px', background: '#f9f9f9', overflowX: 'auto' },
+      thumbImg: { width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px', cursor: 'pointer', opacity: 0.6, transition: 'opacity 0.2s' },
+      thumbImgActive: { opacity: 1, boxShadow: '0 0 0 2px #6366f1' },
+      modalContent: { padding: '24px' },
+      modalMeta: { display: 'flex', gap: '8px', alignItems: 'center', color: '#888', fontSize: '14px', marginBottom: '8px' },
+      modalType: { color: '#6366f1', fontWeight: '600' },
+      modalTitle: { fontSize: '24px', fontWeight: '700', marginBottom: '12px', fontFamily: '"Space Grotesk", sans-serif' },
+      modalUrl: { display: 'inline-block', color: '#6366f1', fontSize: '14px', marginBottom: '12px', textDecoration: 'none' },
+      modalNote: { color: '#555', fontSize: '15px', lineHeight: 1.6, marginBottom: '16px', padding: '16px', background: '#f9f9f9', borderRadius: '8px', minHeight: '60px' },
+      modalTags: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' },
+      modalTag: { fontSize: '13px', color: '#6366f1', background: '#f0f0ff', padding: '4px 12px', borderRadius: '6px', border: '1px solid #e0e7ff' },
+      figmaSection: { marginBottom: '20px' },
+      figmaHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
+      copyBtn: { padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', transition: 'all 0.2s' },
+      copyBtnSuccess: { background: '#22c55e' },
+      figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace', overflow: 'auto', maxHeight: '280px' },
+      figmaMemo: { marginTop: '10px', padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '10px', color: '#475569', fontSize: '13px', lineHeight: 1.5 },
+      generateBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' },
+      generateBtnDisabled: { background: '#a5a6f6', cursor: 'not-allowed' },
+      spinner: { width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+      modalFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #eee' },
+      modalActions: { display: 'flex', gap: '8px' },
+      editBtn: { padding: '8px 16px', background: '#f0f0f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      deleteBtn: { padding: '8px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      formGroup: { marginBottom: '20px' },
+      label: { display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#333' },
+      input: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
+      select: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
+      imageUploadArea: { display: 'flex', flexWrap: 'wrap', gap: '16px' },
+      uploadedImage: { position: 'relative', width: '180px' },
+      uploadedThumb: { width: '180px', height: '120px', objectFit: 'cover', borderRadius: '8px' },
+      removeImgBtn: { position: 'absolute', top: '-8px', right: '-8px', width: '24px', height: '24px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' },
+      imgNoteInput: { width: '100%', marginTop: '8px', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', fontFamily: '"Outfit", sans-serif', resize: 'vertical', minHeight: '60px' },
+      addImageBtn: { width: '180px', height: '120px', border: '2px dashed #d1d5db', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', fontFamily: '"Outfit", sans-serif', transition: 'border-color 0.2s' },
+      tagsContainer: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' },
+      tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f0ff', color: '#6366f1', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
+      tagRemove: { background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '16px', padding: 0 },
+      tagInputWrapper: { position: 'relative' },
+      tagSuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
+      tagSuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      categoryInputWrapper: { position: 'relative' },
+      categorySuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
+      categorySuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      categorySuggestionNew: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: '#f0fdf4', color: '#16a34a', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', fontWeight: '500' },
+      colorPicker: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      colorHexRow: { display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' },
+      colorHexAddBtn: { padding: '12px 14px', background: '#111827', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif', fontWeight: '600', whiteSpace: 'nowrap' },
+      colorDot: { width: '10px', height: '10px', borderRadius: '999px', display: 'inline-block', border: '1px solid #e5e7eb', marginRight: '6px' },
+      colorBtn: { width: '32px', height: '32px', borderRadius: '50%', border: '2px solid transparent', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' },
+      colorBtnActive: { transform: 'scale(1.15)', boxShadow: '0 0 0 3px rgba(99,102,241,0.4)' },
+      componentCheckbox: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '12px', color: '#6366f1', cursor: 'pointer' },
+      submitBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', fontFamily: '"Outfit", sans-serif' },
+      editBtns: { display: 'flex', gap: '12px' },
+      cancelBtn: { flex: 1, padding: '14px', background: '#f0f0f5', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      categoryFilterSection: { maxWidth: '1400px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+      filterLabel: { fontSize: '13px', color: '#888', fontWeight: '600', minWidth: '70px' },
+      categoryFilter: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      catButton: { padding: '6px 14px', background: '#f5f5f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', color: '#555', transition: 'all 0.2s' },
+      catButtonActive: { background: '#6366f1', color: '#fff' },
+      tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+      tagFilterList: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
+      tagFilterBtn: { padding: '4px 12px', background: '#f0f0ff', border: '1px solid #e0e7ff', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#6366f1', transition: 'all 0.2s' },
+      tagFilterBtnActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
+      clearTagsBtn: { padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif' },
+      zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
+      zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
+    };
 
-    return res.status(200).json({ success: true, figmaCode: code });
-
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-}
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
