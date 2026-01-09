@@ -584,7 +584,7 @@
                   <div style={styles.modalMeta}>
                     <span style={styles.modalType}>{TYPES.find(t => t.id === selectedRef.type)?.emoji} {selectedRef.type}</span>
                     <span>•</span>
-                    <span>{CATEGORIES[selectedRef.type]?.find(c => c.id === selectedRef.category)?.name}</span>
+                    <span>{selectedRef.category}</span>
                   </div>
                   <h2 style={styles.modalTitle}>{selectedRef.title}</h2>
                   {selectedRef.url && (
