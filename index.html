@@ -1,25 +1,58 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reflex - Designer's Archive</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap"
+    rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Outfit', sans-serif; background: linear-gradient(180deg, #FAFBFC 0%, #F5F7FA 50%, #EEF2F7 100%); min-height: 100vh; }
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: linear-gradient(180deg, #FAFBFC 0%, #F5F7FA 50%, #EEF2F7 100%);
+      min-height: 100vh;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
   </style>
 </head>
+
 <body>
   <div id="root"></div>
-  
+
   <script type="text/babel">
     const { useState, useMemo, useEffect, useRef } = React;
 
@@ -86,7 +119,7 @@
         }
         return DEFAULT_REFERENCES;
       });
-      
+
       const [activeType, setActiveType] = useState('all');
       const [activeCategory, setActiveCategory] = useState('all');
       const [searchQuery, setSearchQuery] = useState('');
@@ -104,7 +137,7 @@
       const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
       const tagInputRef = useRef(null);
       const categoryInputRef = useRef(null);
-      
+
       // 드롭다운 닫기 - blur 이벤트 사용 (모달과 충돌 방지)
       const handleTagInputBlur = (e) => {
         // 드롭다운 내부 클릭 시에는 닫지 않음
@@ -114,25 +147,15 @@
           }
         }, 150);
       };
-      
+
       const handleCategoryInputBlur = (e) => {
         setTimeout(() => {
           if (!categoryInputRef.current?.contains(document.activeElement)) {
             setShowCategorySuggestions(false);
           }
-        }, 200);
+        }, 150);
       };
-      
-      const handleCategoryInputChange = (value) => {
-        setNewRef(p => ({ ...p, category: value }));
-        setShowCategorySuggestions(true);
-      };
-      
-      const handleEditCategoryInputChange = (value) => {
-        setEditRef(p => ({ ...p, category: value }));
-        setShowCategorySuggestions(true);
-      };
-      
+
       const [newRef, setNewRef] = useState({
         type: 'web',
         title: '',
@@ -156,10 +179,6 @@
         { id: 'black', color: '#1f2937' },
         { id: 'white', color: '#f9fafb' },
       ];
-      
-      // 상태: 선택된 컬러들 (복수 선택)
-      const [selectedColors, setSelectedColors] = useState([]);
-      const [customHexColor, setCustomHexColor] = useState('');
 
       // Save to localStorage
       useEffect(() => {
@@ -210,50 +229,16 @@
         });
       }, [references, activeType, activeCategory, searchQuery, selectedTags]);
 
-      // 이미지 자동 리사이징 및 압축
-      const compressImage = (dataUrl) => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const maxWidth = 1600;
-            const maxHeight = 1200;
-            let width = img.width;
-            let height = img.height;
-            
-            if (width > height) {
-              if (width > maxWidth) {
-                height = Math.round((height * maxWidth) / width);
-                width = maxWidth;
-              }
-            } else {
-              if (height > maxHeight) {
-                width = Math.round((width * maxHeight) / height);
-                height = maxHeight;
-              }
-            }
-            
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.7));
-          };
-          img.src = dataUrl;
-        });
-      };
-      
       // 이미지 업로드 핸들러
       const handleImageUpload = (e, isEdit = false) => {
         const files = Array.from(e.target.files || []);
         files.forEach(file => {
           if (file.type.startsWith('image/')) {
             const reader = new FileReader();
-            reader.onload = async (ev) => {
-              const compressedSrc = await compressImage(ev.target.result);
+            reader.onload = (ev) => {
               const newImage = {
                 id: Date.now() + Math.random().toString(36).substr(2, 9),
-                src: compressedSrc,
+                src: ev.target.result,
                 note: '',
                 figmaCode: null,
                 isComponent: false,
@@ -357,14 +342,14 @@
         if (isEdit) {
           setEditRef(prev => ({
             ...prev,
-            images: prev.images.map(img => 
+            images: prev.images.map(img =>
               img.id === imgId ? { ...img, isComponent: !img.isComponent } : img
             )
           }));
         } else {
           setNewRef(prev => ({
             ...prev,
-            images: prev.images.map(img => 
+            images: prev.images.map(img =>
               img.id === imgId ? { ...img, isComponent: !img.isComponent } : img
             )
           }));
@@ -377,14 +362,14 @@
           alert('제목과 최소 1개의 이미지가 필요합니다.');
           return;
         }
-        
+
         const addedAt = formatDateTime();
         const reference = {
           id: Date.now(),
           ...newRef,
           addedAt,
         };
-        
+
         // 컴포넌트로 체크된 이미지들 자동 추가
         const componentImages = newRef.images.filter(img => img.isComponent);
         const componentRefs = componentImages.map((img, idx) => ({
@@ -398,7 +383,7 @@
           addedAt,
           sourceRefId: reference.id, // 원본 참조
         }));
-        
+
         setReferences(prev => [reference, ...componentRefs, ...prev]);
         setIsAddModalOpen(false);
         setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [] });
@@ -425,11 +410,11 @@
         if (!img) return;
 
         setIsGenerating(imgId);
-        
+
         try {
           let base64Data = img.src;
           let mimeType = 'image/png';
-          
+
           if (img.src.startsWith('data:')) {
             const [header, data] = img.src.split(',');
             mimeType = header.match(/data:(.*?);/)?.[1] || 'image/png';
@@ -460,15 +445,13 @@
               componentName: ref.title,
               imageWidth: imgEl.naturalWidth,
               imageHeight: imgEl.naturalHeight,
-              imageNote: img.note || '',
-              imageTags: ref.tags || [],
             }),
           });
 
           if (!apiResponse.ok) throw new Error('API failed');
-          
+
           const result = await apiResponse.json();
-          
+
           if (result.figmaCode) {
             setReferences(prev => prev.map(r => {
               if (r.id !== refId) return r;
@@ -503,7 +486,7 @@
 
       // 태그 토글 (다중 선택)
       const toggleTag = (tag) => {
-        setSelectedTags(prev => 
+        setSelectedTags(prev =>
           prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
         );
       };
@@ -536,16 +519,13 @@
                 </button>
               ))}
             </div>
-            <div style={styles.searchWrapper}>
-              <span style={styles.searchIcon}>🔍</span>
-              <input
-                type="text"
-                placeholder="Search title, tags, description..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={styles.searchInput}
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="Search title, tags, description..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={styles.searchInput}
+            />
           </section>
 
           {/* Category Filter */}
@@ -581,9 +561,9 @@
                   <button
                     key={tag}
                     onClick={() => toggleTag(tag)}
-                    style={{ 
-                      ...styles.tagFilterBtn, 
-                      ...(selectedTags.includes(tag) ? styles.tagFilterBtnActive : {}) 
+                    style={{
+                      ...styles.tagFilterBtn,
+                      ...(selectedTags.includes(tag) ? styles.tagFilterBtnActive : {})
                     }}
                   >
                     {tag}
@@ -628,7 +608,7 @@
             <div style={styles.modalOverlay} onClick={() => setSelectedRef(null)}>
               <div style={styles.modal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
-                
+
                 {/* 이미지 갤러리 */}
                 <div style={styles.imageGallery}>
                   <img
@@ -662,7 +642,7 @@
                   {selectedRef.url && (
                     <a href={selectedRef.url} target="_blank" style={styles.modalUrl}>{selectedRef.url} ↗</a>
                   )}
-                  
+
                   {/* 현재 이미지 노트 */}
                   {selectedRef.images[selectedImageIndex]?.note && (
                     <p style={styles.modalNote}>{selectedRef.images[selectedImageIndex].note}</p>
@@ -688,19 +668,9 @@
                             {copySuccess ? '✓ Copied!' : 'Copy'}
                           </button>
                         </div>
-                        <div style={styles.figmaCodeContainer}>
-                          <pre style={styles.figmaCode}>
-                            {selectedRef.images[selectedImageIndex].figmaCode}
-                          </pre>
-                          <div style={styles.figmaInsertionGuide}>
-                            <strong>Figma에 삽입하는 방법:</strong>
-                            <ol style={{marginLeft: '20px', marginTop: '8px'}}>
-                              <li>Figma 플러그인 &gt; Plugins &gt; Development &gt; New plugin 또는 기존 플러그인 선택</li>
-                              <li>code.ts에 위의 코드를 복사하여 붙여넣기</li>
-                              <li>플러그인 실행하면 자동으로 컴포넌트가 생성됩니다</li>
-                            </ol>
-                          </div>
-                        </div>
+                        <pre style={styles.figmaCode}>
+                          {selectedRef.images[selectedImageIndex].figmaCode.slice(0, 300)}...
+                        </pre>
                       </>
                     ) : (
                       <button
@@ -720,7 +690,7 @@
                   <div style={styles.modalFooter}>
                     <span>{selectedRef.addedAt}</span>
                     <div style={styles.modalActions}>
-                      <button style={styles.editBtn} onClick={() => { setEditRef({...selectedRef}); setIsEditModalOpen(true); }}>
+                      <button style={styles.editBtn} onClick={() => { setEditRef({ ...selectedRef }); setIsEditModalOpen(true); }}>
                         ✎ Edit
                       </button>
                       <button style={styles.deleteBtn} onClick={() => handleDeleteReference(selectedRef.id)}>
@@ -845,7 +815,7 @@
                     <input
                       type="text"
                       value={newRef.category}
-                      onChange={e => handleCategoryInputChange(e.target.value)}
+                      onChange={e => { setNewRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
                       onFocus={() => setShowCategorySuggestions(true)}
                       onBlur={handleCategoryInputBlur}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(newRef.type, newRef.category); } }}
@@ -857,17 +827,17 @@
                         {allCategories[newRef.type]
                           .filter(cat => cat.toLowerCase().includes(newRef.category.toLowerCase()))
                           .map(cat => (
-                            <button 
-                              key={cat} 
+                            <button
+                              key={cat}
                               style={styles.categorySuggestion}
                               onMouseDown={e => e.preventDefault()}
-                              onClick={() => { handleCategoryInputChange(cat); setShowCategorySuggestions(false); }}
+                              onClick={() => { setNewRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
                             >
                               {cat}
                             </button>
                           ))}
                         {newRef.category && !allCategories[newRef.type]?.includes(newRef.category) && (
-                          <button 
+                          <button
                             style={styles.categorySuggestionNew}
                             onMouseDown={e => e.preventDefault()}
                             onClick={() => handleAddCategory(newRef.type, newRef.category)}
@@ -924,51 +894,12 @@
                         style={{
                           ...styles.colorBtn,
                           backgroundColor: c.color,
-                          ...(selectedColors.includes(c.color) ? styles.colorBtnActive : {})
+                          ...(newRef.color === c.id ? styles.colorBtnActive : {})
                         }}
-                        onClick={() => setSelectedColors(prev => 
-                          prev.includes(c.color) ? prev.filter(col => col !== c.color) : [...prev, c.color]
-                        )}
-                        title={c.id}
+                        onClick={() => setNewRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
                       />
                     ))}
                   </div>
-                  <div style={styles.hexColorInputWrapper}>
-                    <input
-                      type="text"
-                      placeholder="#000000"
-                      value={customHexColor}
-                      onChange={e => setCustomHexColor(e.target.value)}
-                      style={styles.hexColorInput}
-                    />
-                    <button
-                      style={styles.addHexColorBtn}
-                      onClick={() => {
-                        if (customHexColor.match(/^#[0-9A-Fa-f]{6}$/)) {
-                          setSelectedColors(prev => [...prev, customHexColor]);
-                          setCustomHexColor('');
-                        }
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {selectedColors.length > 0 && (
-                    <div style={styles.selectedColorsDisplay}>
-                      {selectedColors.map((col, idx) => (
-                        <div key={idx} style={styles.selectedColorItem}>
-                          <div style={{...styles.selectedColorBox, backgroundColor: col}} />
-                          <span>{col}</span>
-                          <button
-                            style={styles.removeColorBtn}
-                            onClick={() => setSelectedColors(prev => prev.filter((_, i) => i !== idx))}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <button style={styles.submitBtn} onClick={handleAddReference}>
@@ -1086,7 +1017,7 @@
                     <input
                       type="text"
                       value={editRef.category}
-                      onChange={e => handleEditCategoryInputChange(e.target.value)}
+                      onChange={e => { setEditRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
                       onFocus={() => setShowCategorySuggestions(true)}
                       onBlur={handleCategoryInputBlur}
                       style={styles.input}
@@ -1097,11 +1028,10 @@
                         {allCategories[editRef.type]
                           .filter(cat => cat.toLowerCase().includes((editRef.category || '').toLowerCase()))
                           .map(cat => (
-                            <button 
-                              key={cat} 
+                            <button
+                              key={cat}
                               style={styles.categorySuggestion}
-                              onMouseDown={e => e.preventDefault()}
-                              onClick={() => { handleEditCategoryInputChange(cat); setShowCategorySuggestions(false); }}
+                              onClick={() => { setEditRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
                             >
                               {cat}
                             </button>
@@ -1122,7 +1052,7 @@
                       </span>
                     ))}
                   </div>
-                  <div style={styles.tagInputWrapper}>
+                  <div style={styles.tagInputWrapper} ref={tagInputRef}>
                     <input
                       type="text"
                       value={tagInput}
@@ -1155,51 +1085,12 @@
                         style={{
                           ...styles.colorBtn,
                           backgroundColor: c.color,
-                          ...(selectedColors.includes(c.color) ? styles.colorBtnActive : {})
+                          ...(editRef.color === c.id ? styles.colorBtnActive : {})
                         }}
-                        onClick={() => setSelectedColors(prev => 
-                          prev.includes(c.color) ? prev.filter(col => col !== c.color) : [...prev, c.color]
-                        )}
-                        title={c.id}
+                        onClick={() => setEditRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
                       />
                     ))}
                   </div>
-                  <div style={styles.hexColorInputWrapper}>
-                    <input
-                      type="text"
-                      placeholder="#000000"
-                      value={customHexColor}
-                      onChange={e => setCustomHexColor(e.target.value)}
-                      style={styles.hexColorInput}
-                    />
-                    <button
-                      style={styles.addHexColorBtn}
-                      onClick={() => {
-                        if (customHexColor.match(/^#[0-9A-Fa-f]{6}$/)) {
-                          setSelectedColors(prev => [...prev, customHexColor]);
-                          setCustomHexColor('');
-                        }
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {selectedColors.length > 0 && (
-                    <div style={styles.selectedColorsDisplay}>
-                      {selectedColors.map((col, idx) => (
-                        <div key={idx} style={styles.selectedColorItem}>
-                          <div style={{...styles.selectedColorBox, backgroundColor: col}} />
-                          <span>{col}</span>
-                          <button
-                            style={styles.removeColorBtn}
-                            onClick={() => setSelectedColors(prev => prev.filter((_, i) => i !== idx))}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <div style={styles.editBtns}>
@@ -1232,9 +1123,7 @@
       typeToggle: { display: 'flex', gap: '8px' },
       typeButton: { padding: '8px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif', fontSize: '14px' },
       typeButtonActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
-      searchWrapper: { position: 'relative', minWidth: '280px' },
-      searchIcon: { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px', pointerEvents: 'none' },
-      searchInput: { padding: '10px 16px 10px 40px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', width: '100%', fontFamily: '"Outfit", sans-serif', transition: 'all 0.2s' },
+      searchInput: { padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', width: '200px', fontFamily: '"Outfit", sans-serif' },
       categoryFilter: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' },
       catButton: { padding: '6px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
       catButtonActive: { background: '#f0f0ff', borderColor: '#6366f1', color: '#6366f1' },
@@ -1247,10 +1136,10 @@
       cardContent: { padding: '16px' },
       cardTitle: { fontSize: '16px', fontWeight: '600', marginBottom: '8px', fontFamily: '"Space Grotesk", sans-serif' },
       cardTags: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
-      cardTag: { fontSize: '12px', color: '#fff', background: '#6366f1', padding: '2px 8px', borderRadius: '4px' },
+      cardTag: { fontSize: '12px', color: '#6366f1', background: '#f0f0ff', padding: '2px 8px', borderRadius: '4px' },
       modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
       modal: { background: '#fff', borderRadius: '20px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflow: 'auto', position: 'relative' },
-      addModal: { background: '#fff', borderRadius: '20px', maxWidth: '750px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '30px', position: 'relative' },
+      addModal: { background: '#fff', borderRadius: '20px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '30px', position: 'relative' },
       modalClose: { position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', background: '#f5f5f5', border: 'none', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', zIndex: 10 },
       imageGallery: { position: 'relative' },
       modalImage: { width: '100%', maxHeight: '400px', objectFit: 'contain', background: '#f5f5f5', cursor: 'zoom-in' },
@@ -1264,14 +1153,12 @@
       modalUrl: { display: 'inline-block', color: '#6366f1', fontSize: '14px', marginBottom: '12px', textDecoration: 'none' },
       modalNote: { color: '#555', fontSize: '15px', lineHeight: 1.6, marginBottom: '16px', padding: '16px', background: '#f9f9f9', borderRadius: '8px', minHeight: '60px' },
       modalTags: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' },
-      modalTag: { fontSize: '13px', color: '#fff', background: '#6366f1', padding: '4px 12px', borderRadius: '6px' },
+      modalTag: { fontSize: '13px', color: '#6366f1', background: '#f0f0ff', padding: '4px 12px', borderRadius: '6px' },
       figmaSection: { marginBottom: '20px' },
       figmaHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
       copyBtn: { padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', transition: 'all 0.2s' },
       copyBtnSuccess: { background: '#22c55e' },
-      figmaCodeContainer: { marginBottom: '16px' },
-      figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace', overflow: 'auto', maxHeight: '400px', marginBottom: '12px' },
-      figmaInsertionGuide: { background: '#f0f9ff', padding: '12px', borderRadius: '6px', fontSize: '12px', color: '#1e40af', lineHeight: 1.6, borderLeft: '3px solid #3b82f6' },
+      figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace', overflow: 'auto', maxHeight: '150px' },
       generateBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' },
       generateBtnDisabled: { background: '#a5a6f6', cursor: 'not-allowed' },
       spinner: { width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
@@ -1313,22 +1200,16 @@
       catButtonActive: { background: '#6366f1', color: '#fff' },
       tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
       tagFilterList: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
-      tagFilterBtn: { padding: '5px 12px', background: '#f0f0ff', border: '1px solid #ddd6fe', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#6366f1', transition: 'all 0.2s' },
-      tagFilterBtnActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
+      tagFilterBtn: { padding: '5px 12px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#7c3aed', transition: 'all 0.2s' },
+      tagFilterBtnActive: { background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' },
       clearTagsBtn: { padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif' },
       zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
       zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
-      hexColorInputWrapper: { display: 'flex', gap: '8px', marginTop: '12px' },
-      hexColorInput: { flex: 1, padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
-      addHexColorBtn: { padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontFamily: '"Outfit", sans-serif' },
-      selectedColorsDisplay: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' },
-      selectedColorItem: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', background: '#f5f5f5', borderRadius: '6px', fontSize: '12px' },
-      selectedColorBox: { width: '16px', height: '16px', borderRadius: '3px', border: '1px solid #ccc' },
-      removeColorBtn: { background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '14px', padding: 0 },
     };
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
 </body>
+
 </html>
