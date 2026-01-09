@@ -11,39 +11,17 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    
-    body {
-      font-family: 'Outfit', sans-serif;
-      background: linear-gradient(180deg, #FAFBFC 0%, #F5F7FA 50%, #EEF2F7 100%);
-      min-height: 100vh;
-    }
-    
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes float {
-      0%, 100% { transform: translateY(0px) rotate(0deg); }
-      50% { transform: translateY(-20px) rotate(5deg); }
-    }
-    
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Outfit', sans-serif; background: linear-gradient(180deg, #FAFBFC 0%, #F5F7FA 50%, #EEF2F7 100%); min-height: 100vh; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <div id="root"></div>
   
   <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+    const { useState, useMemo, useEffect, useRef } = React;
 
     const TYPES = [
       { id: 'all', name: 'All', emoji: '✦' },
@@ -60,7 +38,6 @@
         { id: 'dashboard', name: 'Dashboard', emoji: '▣' },
         { id: 'blog', name: 'Blog', emoji: '▤' },
         { id: 'corporate', name: 'Corporate', emoji: '◧' },
-        { id: 'experimental', name: 'Experimental', emoji: '◉' },
       ],
       component: [
         { id: 'all', name: 'All', emoji: '✦' },
@@ -70,730 +47,466 @@
         { id: 'card', name: 'Card', emoji: '▣' },
         { id: 'form', name: 'Form', emoji: '▤' },
         { id: 'modal', name: 'Modal', emoji: '◳' },
-        { id: 'footer', name: 'Footer', emoji: '▥' },
-        { id: 'table', name: 'Table', emoji: '▦' },
         { id: 'sidebar', name: 'Sidebar', emoji: '◧' },
-        { id: 'toast', name: 'Toast', emoji: '◫' },
-        { id: 'dropdown', name: 'Dropdown', emoji: '▼' },
-        { id: 'tabs', name: 'Tabs', emoji: '◰' },
-        { id: 'carousel', name: 'Carousel', emoji: '◷' },
-        { id: 'animation', name: 'Animation', emoji: '✧' },
       ],
     };
 
-    const COLORS = [
-      { id: 'all', name: 'All', color: null },
-      { id: 'red', name: 'Red', color: '#ef4444' },
-      { id: 'orange', name: 'Orange', color: '#f97316' },
-      { id: 'yellow', name: 'Yellow', color: '#eab308' },
-      { id: 'green', name: 'Green', color: '#22c55e' },
-      { id: 'blue', name: 'Blue', color: '#3b82f6' },
-      { id: 'purple', name: 'Purple', color: '#8b5cf6' },
-      { id: 'pink', name: 'Pink', color: '#ec4899' },
-      { id: 'gray', name: 'Gray', color: '#6b7280' },
-      { id: 'black', name: 'Black', color: '#1a1a2e' },
-      { id: 'white', name: 'White', color: '#ffffff' },
-    ];
-
+    // 새로운 데이터 구조: images 배열 (각 이미지별 note, figmaCode)
     const DEFAULT_REFERENCES = [
       {
         id: 1,
         type: 'website',
         title: 'Linear Homepage',
         url: 'https://linear.app',
-        thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop',
+        images: [
+          { id: 'img1', src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop', note: '메인 히어로 섹션', figmaCode: null },
+        ],
         category: 'landing',
-        tags: ['minimal', 'dark', 'saas', 'animation'],
-        note: '깔끔한 애니메이션과 그라데이션 조합',
+        tags: ['minimal', 'dark', 'saas'],
         addedAt: '2024.12.15',
       },
       {
         id: 2,
-        type: 'website',
-        title: 'Stripe Press',
-        url: 'https://press.stripe.com',
-        thumbnail: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=400&fit=crop',
-        category: 'ecommerce',
-        tags: ['editorial', 'typography', 'elegant'],
-        note: '타이포그래피 중심의 에디토리얼 디자인',
-        addedAt: '2024.12.14',
-      },
-      {
-        id: 3,
         type: 'component',
-        title: 'Vercel Glassmorphism Nav',
+        title: 'Glass Navigation',
         url: 'https://vercel.com',
-        thumbnail: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=400&fit=crop',
+        images: [
+          { id: 'img2', src: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=400&fit=crop', note: '블러 효과 네비게이션', figmaCode: null },
+        ],
         category: 'navigation',
-        tags: ['glassmorphism', 'blur', 'sticky'],
-        note: '블러 효과를 활용한 투명 네비게이션',
+        tags: ['glassmorphism', 'blur'],
         addedAt: '2024.12.12',
-      },
-      {
-        id: 4,
-        type: 'component',
-        title: 'Stripe Gradient Button',
-        url: 'https://stripe.com',
-        thumbnail: 'https://images.unsplash.com/photo-1557683316-973673baf926?w=600&h=400&fit=crop',
-        category: 'button',
-        tags: ['gradient', 'hover', 'micro-interaction'],
-        note: '호버 시 그라데이션이 움직이는 버튼',
-        addedAt: '2024.12.11',
       },
     ];
 
     function App() {
       const [references, setReferences] = useState(() => {
-        const saved = localStorage.getItem('reflex-references');
-        return saved ? JSON.parse(saved) : DEFAULT_REFERENCES;
+        const saved = localStorage.getItem('reflex-references-v2');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            // 구 데이터 마이그레이션
+            return parsed.map(ref => {
+              if (ref.thumbnail && !ref.images) {
+                return {
+                  ...ref,
+                  images: [{ id: 'migrated', src: ref.thumbnail, note: ref.note || '', figmaCode: ref.figmaCode || null }],
+                };
+              }
+              return ref;
+            });
+          } catch { return DEFAULT_REFERENCES; }
+        }
+        return DEFAULT_REFERENCES;
       });
+      
       const [activeType, setActiveType] = useState('all');
       const [activeCategory, setActiveCategory] = useState('all');
       const [searchQuery, setSearchQuery] = useState('');
       const [selectedTags, setSelectedTags] = useState([]);
       const [selectedRef, setSelectedRef] = useState(null);
+      const [selectedImageIndex, setSelectedImageIndex] = useState(0);
       const [isAddModalOpen, setIsAddModalOpen] = useState(false);
       const [isEditModalOpen, setIsEditModalOpen] = useState(false);
       const [editRef, setEditRef] = useState(null);
       const [imageZoom, setImageZoom] = useState(null);
-      const [isGeneratingForExisting, setIsGeneratingForExisting] = useState(false);
+      const [isGenerating, setIsGenerating] = useState(null); // 이미지 ID
+      const [tagInput, setTagInput] = useState('');
+      const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+      
       const [newRef, setNewRef] = useState({
         type: 'website',
         title: '',
         url: '',
-        thumbnail: '',
+        images: [], // { id, src, note, figmaCode }
         category: 'landing',
-        color: 'all',
-        tags: '',
-        note: '',
+        tags: [],
       });
-      
-      const [uploadedImage, setUploadedImage] = useState(null);
-      const [imagePreview, setImagePreview] = useState(null);
-      const [isAnalyzing, setIsAnalyzing] = useState(false);
-      const [figmaCode, setFigmaCode] = useState(null);
-      const [copySuccess, setCopySuccess] = useState(false);
 
       // Save to localStorage
       useEffect(() => {
-        localStorage.setItem('reflex-references', JSON.stringify(references));
+        localStorage.setItem('reflex-references-v2', JSON.stringify(references));
       }, [references]);
 
+      // 전체 태그 목록
       const allTags = useMemo(() => {
         const tags = new Set();
-        references.forEach(ref => ref.tags.forEach(tag => tags.add(tag)));
+        references.forEach(ref => ref.tags?.forEach(tag => tags.add(tag)));
         return Array.from(tags).sort();
       }, [references]);
 
-      const currentCategories = useMemo(() => {
-        if (activeType === 'all') return [{ id: 'all', name: 'All', emoji: '✦' }];
-        return CATEGORIES[activeType] || [];
-      }, [activeType]);
-
+      // 필터링
       const filteredReferences = useMemo(() => {
         return references.filter(ref => {
-          const matchesType = activeType === 'all' || ref.type === activeType;
-          const matchesCategory = activeCategory === 'all' || ref.category === activeCategory;
-          const matchesSearch = searchQuery === '' || 
-            ref.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            ref.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            ref.note?.toLowerCase().includes(searchQuery.toLowerCase());
-          const matchesTags = selectedTags.length === 0 || 
-            selectedTags.every(tag => ref.tags.includes(tag));
-          return matchesType && matchesCategory && matchesSearch && matchesTags;
+          if (activeType !== 'all' && ref.type !== activeType) return false;
+          if (activeCategory !== 'all' && ref.category !== activeCategory) return false;
+          if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            if (!ref.title.toLowerCase().includes(q) && !ref.tags?.some(t => t.toLowerCase().includes(q))) return false;
+          }
+          if (selectedTags.length > 0 && !selectedTags.every(t => ref.tags?.includes(t))) return false;
+          return true;
         });
       }, [references, activeType, activeCategory, searchQuery, selectedTags]);
 
-      const handleTypeChange = (type) => {
-        setActiveType(type);
-        setActiveCategory('all');
-      };
-
-      const handleTagClick = (tag) => {
-        setSelectedTags(prev => 
-          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-        );
-      };
-
-      const handleImageUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (file && file.type.startsWith('image/')) {
-          setUploadedImage(file);
-          setFigmaCode(null); // 새 이미지 업로드 시 이전 코드 초기화
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            const base64Image = e.target.result;
-            setImagePreview(base64Image);
-            // 자동 분석 제거 - 버튼 클릭 시에만 분석
-          };
-          reader.readAsDataURL(file);
-        }
-      };
-
-      const handleDrop = async (e) => {
-        e.preventDefault();
-        const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) {
-          setUploadedImage(file);
-          setFigmaCode(null); // 새 이미지 업로드 시 이전 코드 초기화
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            const base64Image = e.target.result;
-            setImagePreview(base64Image);
-            // 자동 분석 제거 - 버튼 클릭 시에만 분석
-          };
-          reader.readAsDataURL(file);
-        }
-      };
-
-      const handleGenerateFigmaCode = async () => {
-        if (imagePreview) {
-          await analyzeImageWithAI(imagePreview);
-        }
-      };
-
-      const wrapWithDynamicFontSafety = (code) => {
-        // Collect Inter styles used and preload them. Preserve weights.
-        const styleSet = new Set();
-        const regex = /family\s*:\s*["']Inter["']\s*,\s*style\s*:\s*["']([^"']+)["']/g;
-        let m;
-        while ((m = regex.exec(code)) !== null) {
-          styleSet.add(m[1]);
-        }
-        styleSet.add("Regular"); // always
-
-        const preloadLines = Array.from(styleSet).map((style) =>
-          `  await figma.loadFontAsync({ family: "Inter", style: ${JSON.stringify(style)} });`
-        ).join("\n");
-
-        const trimmed = String(code || "").trim();
-        const hasIIFE = /^\(async\s*\(\)\s*=>\s*\{/.test(trimmed);
-
-        const wrapped = hasIIFE
-          ? trimmed
-          : `(async () => {\n${trimmed}\n})();`;
-
-        // Inject preload right after async IIFE opening
-        const injected = wrapped.replace(
-          /^\(async\s*\(\)\s*=>\s*\{\n?/,
-          (match) => match + preloadLines + "\n"
-        );
-
-        return injected;
-      };
-
-      const getImageMetaFromDataUrl = (dataUrl) => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve({ width: img.naturalWidth || 0, height: img.naturalHeight || 0 });
-          img.onerror = () => resolve({ width: 0, height: 0 });
-          img.src = dataUrl;
+      // 이미지 업로드 핸들러
+      const handleImageUpload = (e, isEdit = false) => {
+        const files = Array.from(e.target.files || []);
+        files.forEach(file => {
+          if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              const newImage = {
+                id: Date.now() + Math.random().toString(36).substr(2, 9),
+                src: ev.target.result,
+                note: '',
+                figmaCode: null,
+              };
+              if (isEdit && editRef) {
+                setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
+              } else {
+                setNewRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
+              }
+            };
+            reader.readAsDataURL(file);
+          }
         });
       };
 
-      const analyzeImageWithAI = async (base64Image) => {
-        setIsAnalyzing(true);
-        setFigmaCode(null);
-
-        try {
-          // base64Image is a DataURL here
-          const mimeType = String(base64Image).slice(5, String(base64Image).indexOf(";")) || "image/png";
-          const base64Data = String(base64Image).split(",")[1] || "";
-
-          const meta = await getImageMetaFromDataUrl(base64Image);
-
-          const response = await fetch('/api/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              image: base64Data,
-              mimeType,
-              componentName: 'GeneratedComponent',
-              imageWidth: meta.width,
-              imageHeight: meta.height
-            })
-          });
-
-          if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`Analyze failed: ${response.status} ${errText}`);
-          }
-
-          const result = await response.json();
-          const rawCode = result.figmaCode || generateFallbackCode('GeneratedComponent');
-
-          // Safety: ensure fonts are preloaded and async wrapper exists, but DO NOT change weights.
-          const safeCode = wrapWithDynamicFontSafety(rawCode);
-
-          setFigmaCode(safeCode);
-        } catch (error) {
-          console.error('Error analyzing image:', error);
-          setFigmaCode(generateFallbackCode('GeneratedComponent'));
-        } finally {
-          setIsAnalyzing(false);
+      // 이미지 삭제
+      const handleRemoveImage = (imgId, isEdit = false) => {
+        if (isEdit) {
+          setEditRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
+        } else {
+          setNewRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
         }
       };
 
-      const generateFallbackCode = (name) => {
-        return `(async () => {
-  // Figma Plugin API Code (fallback)
-  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-  await figma.loadFontAsync({ family: "Inter", style: "Medium" });
-
-  const component = figma.createComponent();
-  component.name = "${name}";
-  component.resize(1200, 220);
-
-  const frame = figma.createFrame();
-  frame.name = "Container";
-  frame.resize(1200, 220);
-  frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-  frame.cornerRadius = 12;
-  frame.layoutMode = "VERTICAL";
-  frame.primaryAxisSizingMode = "AUTO";
-  frame.counterAxisSizingMode = "FIXED";
-  frame.paddingTop = 20;
-  frame.paddingBottom = 20;
-  frame.paddingLeft = 24;
-  frame.paddingRight = 24;
-  frame.itemSpacing = 16;
-
-  // Header row
-  const header = figma.createFrame();
-  header.name = "Header";
-  header.layoutMode = "HORIZONTAL";
-  header.primaryAxisSizingMode = "AUTO";
-  header.counterAxisSizingMode = "AUTO";
-  header.itemSpacing = 12;
-  header.fills = [];
-
-  const icon = figma.createRectangle();
-  icon.name = "Icon";
-  icon.resize(18, 18);
-  icon.cornerRadius = 6;
-  icon.fills = [{ type: 'SOLID', color: { r: 0.31, g: 0.36, b: 0.93 } }];
-
-  const label = figma.createText();
-  label.name = "Label";
-  label.fontName = { family: "Inter", style: "Medium" };
-  label.fontSize = 16;
-  label.characters = "Research";
-  label.fills = [{ type: 'SOLID', color: { r: 0.12, g: 0.14, b: 0.18 } }];
-
-  header.appendChild(icon);
-  header.appendChild(label);
-
-  // Title
-  const title = figma.createText();
-  title.name = "Title";
-  title.fontName = { family: "Inter", style: "Medium" };
-  title.fontSize = 18;
-  title.characters = "You may also want to ask";
-  title.fills = [{ type: 'SOLID', color: { r: 0.12, g: 0.14, b: 0.18 } }];
-
-  // Cards row
-  const cards = figma.createFrame();
-  cards.name = "Cards";
-  cards.layoutMode = "HORIZONTAL";
-  cards.primaryAxisSizingMode = "AUTO";
-  cards.counterAxisSizingMode = "AUTO";
-  cards.itemSpacing = 16;
-  cards.fills = [];
-
-  const makeCard = (text) => {
-    const card = figma.createFrame();
-    card.name = "Card";
-    card.resize(360, 92);
-    card.layoutMode = "VERTICAL";
-    card.primaryAxisSizingMode = "FIXED";
-    card.counterAxisSizingMode = "FIXED";
-    card.paddingTop = 20;
-    card.paddingBottom = 20;
-    card.paddingLeft = 20;
-    card.paddingRight = 20;
-    card.cornerRadius = 16;
-    card.fills = [{ type: 'SOLID', color: { r: 0.965, g: 0.969, b: 0.98 } }];
-    card.strokes = [{ type: 'SOLID', color: { r: 0.91, g: 0.92, b: 0.94 } }];
-    card.strokeWeight = 1;
-
-    const t = figma.createText();
-    t.fontName = { family: "Inter", style: "Regular" };
-    t.fontSize = 16;
-    t.lineHeight = { value: 24, unit: "PIXELS" };
-    t.characters = text;
-    t.fills = [{ type: 'SOLID', color: { r: 0.12, g: 0.14, b: 0.18 } }];
-
-    card.appendChild(t);
-    return card;
-  };
-
-  cards.appendChild(makeCard("What industries are leading in LLM adoption?"));
-  cards.appendChild(makeCard("Can you break down specific use cases?"));
-  cards.appendChild(makeCard("What challenges do businesses face with LLMs?"));
-
-  frame.appendChild(header);
-  frame.appendChild(title);
-  frame.appendChild(cards);
-
-  component.appendChild(frame);
-  figma.currentPage.appendChild(component);
-  figma.viewport.scrollAndZoomIntoView([component]);
-})();`;
-      };
-const copyToClipboard = async (text) => {
-        await navigator.clipboard.writeText(text || figmaCode);
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000);
+      // 이미지 노트 수정
+      const handleImageNoteChange = (imgId, note, isEdit = false) => {
+        if (isEdit) {
+          setEditRef(prev => ({
+            ...prev,
+            images: prev.images.map(img => img.id === imgId ? { ...img, note } : img)
+          }));
+        } else {
+          setNewRef(prev => ({
+            ...prev,
+            images: prev.images.map(img => img.id === imgId ? { ...img, note } : img)
+          }));
+        }
       };
 
-      const resetImageUpload = () => {
-        setUploadedImage(null);
-        setImagePreview(null);
-        setFigmaCode(null);
+      // 태그 추가
+      const handleAddTag = (tag, isEdit = false) => {
+        const trimmed = tag.trim().toLowerCase();
+        if (!trimmed) return;
+        if (isEdit) {
+          if (!editRef.tags.includes(trimmed)) {
+            setEditRef(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
+          }
+        } else {
+          if (!newRef.tags.includes(trimmed)) {
+            setNewRef(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
+          }
+        }
+        setTagInput('');
+        setShowTagSuggestions(false);
       };
 
-      const closeAddModal = () => {
-        setIsAddModalOpen(false);
-        setNewRef({ type: 'website', title: '', url: '', thumbnail: '', category: 'landing', tags: '', note: '' });
-        resetImageUpload();
+      // 태그 제거
+      const handleRemoveTag = (tag, isEdit = false) => {
+        if (isEdit) {
+          setEditRef(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+        } else {
+          setNewRef(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+        }
       };
 
+      // 태그 제안 필터
+      const filteredTagSuggestions = useMemo(() => {
+        if (!tagInput) return allTags.slice(0, 10);
+        return allTags.filter(t => t.includes(tagInput.toLowerCase())).slice(0, 10);
+      }, [tagInput, allTags]);
+
+      // 레퍼런스 추가
       const handleAddReference = () => {
-        if (!newRef.title) return;
+        if (!newRef.title || newRef.images.length === 0) {
+          alert('제목과 최소 1개의 이미지가 필요합니다.');
+          return;
+        }
         
         const reference = {
           id: Date.now(),
-          type: newRef.type,
-          title: newRef.title,
-          url: newRef.url,
-          thumbnail: imagePreview || newRef.thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop',
-          category: newRef.category,
-          tags: newRef.tags.split(',').map(t => t.trim()).filter(Boolean),
-          note: newRef.note,
-          figmaCode: figmaCode || null,
-          addedAt: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').slice(0, -1),
+          ...newRef,
+          addedAt: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace('.', ''),
         };
         
         setReferences(prev => [reference, ...prev]);
-        closeAddModal();
+        setIsAddModalOpen(false);
+        setNewRef({ type: 'website', title: '', url: '', images: [], category: 'landing', tags: [] });
       };
 
+      // 레퍼런스 수정 저장
+      const handleSaveEdit = () => {
+        if (!editRef.title) return;
+        setReferences(prev => prev.map(ref => ref.id === editRef.id ? editRef : ref));
+        setSelectedRef(editRef);
+        setIsEditModalOpen(false);
+      };
+
+      // 레퍼런스 삭제
       const handleDeleteReference = (id) => {
         setReferences(prev => prev.filter(ref => ref.id !== id));
         setSelectedRef(null);
       };
 
-      // 수정 모달 열기
-      const openEditModal = (ref) => {
-        setEditRef({
-          ...ref,
-          tags: ref.tags.join(', '),
-        });
-        setIsEditModalOpen(true);
-      };
+      // Figma 코드 생성 (특정 이미지)
+      const handleGenerateFigma = async (refId, imgId) => {
+        const ref = references.find(r => r.id === refId);
+        const img = ref?.images.find(i => i.id === imgId);
+        if (!img) return;
 
-      // 수정 저장
-      const handleSaveEdit = () => {
-        if (!editRef.title) return;
-        
-        const updatedRef = {
-          ...editRef,
-          tags: editRef.tags.split(',').map(t => t.trim()).filter(t => t),
-        };
-        
-        setReferences(prev => prev.map(ref => 
-          ref.id === updatedRef.id ? updatedRef : ref
-        ));
-        setSelectedRef(updatedRef);
-        setIsEditModalOpen(false);
-        setEditRef(null);
-      };
-
-      // 기존 이미지에 AI 분석 실행
-      const handleGenerateForExisting = async (ref) => {
-        if (!ref.thumbnail || isGeneratingForExisting) return;
-        
-        setIsGeneratingForExisting(true);
+        setIsGenerating(imgId);
         
         try {
-          // 이미지 URL을 base64로 변환
-          const response = await fetch(ref.thumbnail);
-          const blob = await response.blob();
+          let base64Data = img.src;
+          let mimeType = 'image/png';
           
-          const base64 = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
-          
-          const base64Data = base64.split(",")[1] || "";
-          const mimeType = blob.type || 'image/png';
-          
-          // 이미지 크기 가져오기
-          const img = new Image();
-          img.src = ref.thumbnail;
-          await new Promise(resolve => { img.onload = resolve; });
-          
+          if (img.src.startsWith('data:')) {
+            const [header, data] = img.src.split(',');
+            mimeType = header.match(/data:(.*?);/)?.[1] || 'image/png';
+            base64Data = data;
+          } else {
+            // URL인 경우 fetch
+            const response = await fetch(img.src);
+            const blob = await response.blob();
+            mimeType = blob.type;
+            base64Data = await new Promise(resolve => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result.split(',')[1]);
+              reader.readAsDataURL(blob);
+            });
+          }
+
+          // 이미지 크기
+          const imgEl = new Image();
+          imgEl.src = img.src;
+          await new Promise(resolve => { imgEl.onload = resolve; });
+
           const apiResponse = await fetch('/api/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               image: base64Data,
               mimeType,
-              componentName: ref.title || 'GeneratedComponent',
-              imageWidth: img.naturalWidth,
-              imageHeight: img.naturalHeight
-            })
+              componentName: ref.title,
+              imageWidth: imgEl.naturalWidth,
+              imageHeight: imgEl.naturalHeight,
+            }),
           });
-          
-          if (!apiResponse.ok) {
-            throw new Error('API failed');
-          }
+
+          if (!apiResponse.ok) throw new Error('API failed');
           
           const result = await apiResponse.json();
           
           if (result.figmaCode) {
-            // 해당 레퍼런스 업데이트
-            const updatedRef = { ...ref, figmaCode: result.figmaCode };
-            setReferences(prev => prev.map(r => 
-              r.id === ref.id ? updatedRef : r
-            ));
-            setSelectedRef(updatedRef);
+            setReferences(prev => prev.map(r => {
+              if (r.id !== refId) return r;
+              return {
+                ...r,
+                images: r.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
+              };
+            }));
+            // 현재 선택된 ref 업데이트
+            if (selectedRef?.id === refId) {
+              setSelectedRef(prev => ({
+                ...prev,
+                images: prev.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
+              }));
+            }
           }
         } catch (error) {
-          console.error('AI 분석 실패:', error);
-          alert('AI 분석에 실패했습니다. 다시 시도해주세요.');
+          console.error('Figma 생성 실패:', error);
+          alert('Figma 코드 생성에 실패했습니다.');
         } finally {
-          setIsGeneratingForExisting(false);
+          setIsGenerating(null);
         }
+      };
+
+      // 클립보드 복사
+      const copyToClipboard = (code) => {
+        navigator.clipboard.writeText(code);
       };
 
       return (
         <div style={styles.container}>
-          <div style={styles.bgGradient1} />
-          <div style={styles.bgGradient2} />
-          <div style={styles.gridOverlay} />
-
           {/* Header */}
           <header style={styles.header}>
             <div style={styles.headerInner}>
               <div style={styles.logo}>
                 <span style={styles.logoIcon}>◈</span>
                 <span style={styles.logoText}>Reflex</span>
-                <span style={styles.logoBadge}>Designer's Archive</span>
               </div>
               <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)}>
-                <span style={styles.addButtonIcon}>+</span>
-                Add Reference
+                + Add Reference
               </button>
             </div>
           </header>
 
-          {/* Filter Section */}
+          {/* Filters */}
           <section style={styles.filterSection}>
             <div style={styles.typeToggle}>
               {TYPES.map(type => (
                 <button
                   key={type.id}
-                  onClick={() => handleTypeChange(type.id)}
-                  style={{
-                    ...styles.typeButton,
-                    ...(activeType === type.id ? styles.typeButtonActive : {}),
-                  }}
+                  onClick={() => { setActiveType(type.id); setActiveCategory('all'); }}
+                  style={{ ...styles.typeButton, ...(activeType === type.id ? styles.typeButtonActive : {}) }}
                 >
-                  <span>{type.emoji}</span>
-                  {type.name}
-                  <span style={styles.typeCount}>
-                    {type.id === 'all' ? references.length : references.filter(r => r.type === type.id).length}
-                  </span>
+                  {type.emoji} {type.name}
                 </button>
               ))}
             </div>
-
-            <div style={styles.searchWrapper}>
-              <span style={styles.searchIcon}>⌕</span>
-              <input
-                type="text"
-                placeholder="Search by title, tag, or note..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={styles.searchInput}
-              />
-              {searchQuery && (
-                <button style={styles.clearSearch} onClick={() => setSearchQuery('')}>✕</button>
-              )}
-            </div>
-
-            {activeType !== 'all' && (
-              <div style={styles.categories}>
-                {currentCategories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setActiveCategory(cat.id)}
-                    style={{
-                      ...styles.categoryButton,
-                      ...(activeCategory === cat.id ? styles.categoryButtonActive : {}),
-                    }}
-                  >
-                    <span>{cat.emoji}</span>
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {allTags.length > 0 && (
-              <div style={styles.tagsSection}>
-                <span style={styles.tagsLabel}>Tags</span>
-                <div style={styles.tagsList}>
-                  {allTags.map(tag => (
-                    <button
-                      key={tag}
-                      onClick={() => handleTagClick(tag)}
-                      style={{
-                        ...styles.tagButton,
-                        ...(selectedTags.includes(tag) ? styles.tagButtonActive : {}),
-                      }}
-                    >
-                      #{tag}
-                    </button>
-                  ))}
-                </div>
-                {selectedTags.length > 0 && (
-                  <button style={styles.clearTags} onClick={() => setSelectedTags([])}>Clear filters</button>
-                )}
-              </div>
-            )}
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={styles.searchInput}
+            />
           </section>
 
-          {/* Results Count */}
-          <div style={styles.resultsCount}>
-            <span style={styles.resultsNumber}>{filteredReferences.length}</span>
-            <span style={styles.resultsText}>references found</span>
-          </div>
+          {/* Category Filter */}
+          {activeType !== 'all' && (
+            <div style={styles.categoryFilter}>
+              {CATEGORIES[activeType]?.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  style={{ ...styles.catButton, ...(activeCategory === cat.id ? styles.catButtonActive : {}) }}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Grid */}
           <main style={styles.grid}>
-            {filteredReferences.map((ref, index) => (
-              <article
-                key={ref.id}
-                style={{ ...styles.card, animationDelay: `${index * 0.05}s` }}
-                onClick={() => setSelectedRef(ref)}
-              >
+            {filteredReferences.map(ref => (
+              <article key={ref.id} style={styles.card} onClick={() => { setSelectedRef(ref); setSelectedImageIndex(0); }}>
                 <div style={styles.cardImageWrapper}>
-                  <img src={ref.thumbnail} alt={ref.title} style={styles.cardImage} />
-                  <div style={styles.cardOverlay}>
-                    <span style={styles.viewButton}>View Details →</span>
-                  </div>
-                  <span style={styles.cardCategory}>
-                    {TYPES.find(t => t.id === ref.type)?.emoji} {CATEGORIES[ref.type]?.find(c => c.id === ref.category)?.name || ref.category}
-                  </span>
-                  {ref.type === 'component' && <span style={styles.cardTypeBadge}>Component</span>}
-                  {ref.figmaCode && <span style={styles.cardFigmaBadge}>◫</span>}
+                  <img src={ref.images[0]?.src} alt={ref.title} style={styles.cardImage} />
+                  {ref.images.length > 1 && (
+                    <span style={styles.imageCount}>+{ref.images.length - 1}</span>
+                  )}
+                  {ref.images.some(img => img.figmaCode) && (
+                    <span style={styles.figmaBadge}>◫</span>
+                  )}
                 </div>
                 <div style={styles.cardContent}>
                   <h3 style={styles.cardTitle}>{ref.title}</h3>
-                  <p style={styles.cardUrl}>{ref.url.replace(/^https?:\/\//, '')}</p>
                   <div style={styles.cardTags}>
-                    {ref.tags.slice(0, 3).map(tag => (
+                    {ref.tags?.slice(0, 3).map(tag => (
                       <span key={tag} style={styles.cardTag}>#{tag}</span>
                     ))}
-                    {ref.tags.length > 3 && <span style={styles.cardTagMore}>+{ref.tags.length - 3}</span>}
                   </div>
                 </div>
               </article>
             ))}
           </main>
 
-          {/* Empty State */}
-          {filteredReferences.length === 0 && (
-            <div style={styles.emptyState}>
-              <span style={styles.emptyIcon}>◇</span>
-              <p style={styles.emptyText}>No references found</p>
-              <p style={styles.emptySubtext}>Try adjusting your filters or add a new reference</p>
-            </div>
-          )}
-
           {/* Detail Modal */}
           {selectedRef && (
             <div style={styles.modalOverlay} onClick={() => setSelectedRef(null)}>
               <div style={styles.modal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
-                <img 
-                  src={selectedRef.thumbnail} 
-                  alt={selectedRef.title} 
-                  style={styles.modalImage}
-                  onClick={() => setImageZoom(selectedRef.thumbnail)}
-                />
+                
+                {/* 이미지 갤러리 */}
+                <div style={styles.imageGallery}>
+                  <img
+                    src={selectedRef.images[selectedImageIndex]?.src}
+                    alt=""
+                    style={styles.modalImage}
+                    onClick={() => setImageZoom(selectedRef.images[selectedImageIndex]?.src)}
+                  />
+                  {selectedRef.images.length > 1 && (
+                    <div style={styles.imageThumbs}>
+                      {selectedRef.images.map((img, idx) => (
+                        <img
+                          key={img.id}
+                          src={img.src}
+                          alt=""
+                          style={{ ...styles.thumbImg, ...(idx === selectedImageIndex ? styles.thumbImgActive : {}) }}
+                          onClick={() => setSelectedImageIndex(idx)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div style={styles.modalContent}>
                   <div style={styles.modalMeta}>
-                    <span style={styles.modalType}>
-                      {TYPES.find(t => t.id === selectedRef.type)?.emoji} {TYPES.find(t => t.id === selectedRef.type)?.name}
-                    </span>
-                    <span style={styles.modalDivider}>•</span>
-                    <span style={styles.modalCategory}>
-                      {CATEGORIES[selectedRef.type]?.find(c => c.id === selectedRef.category)?.name || selectedRef.category}
-                    </span>
-                    {selectedRef.figmaCode && (
-                      <>
-                        <span style={styles.modalDivider}>•</span>
-                        <span style={styles.figmaReadyBadge}>◫ Figma Ready</span>
-                      </>
-                    )}
+                    <span style={styles.modalType}>{TYPES.find(t => t.id === selectedRef.type)?.emoji} {selectedRef.type}</span>
+                    <span>•</span>
+                    <span>{CATEGORIES[selectedRef.type]?.find(c => c.id === selectedRef.category)?.name}</span>
                   </div>
                   <h2 style={styles.modalTitle}>{selectedRef.title}</h2>
                   {selectedRef.url && (
-                    <a href={selectedRef.url} target="_blank" rel="noopener noreferrer" style={styles.modalUrl}>
-                      {selectedRef.url} ↗
-                    </a>
+                    <a href={selectedRef.url} target="_blank" style={styles.modalUrl}>{selectedRef.url} ↗</a>
                   )}
-                  {selectedRef.note && <p style={styles.modalNote}>{selectedRef.note}</p>}
+                  
+                  {/* 현재 이미지 노트 */}
+                  {selectedRef.images[selectedImageIndex]?.note && (
+                    <p style={styles.modalNote}>{selectedRef.images[selectedImageIndex].note}</p>
+                  )}
+
+                  {/* 태그 */}
                   <div style={styles.modalTags}>
-                    {selectedRef.tags.map(tag => (
+                    {selectedRef.tags?.map(tag => (
                       <span key={tag} style={styles.modalTag}>#{tag}</span>
                     ))}
                   </div>
-                  
-                  {/* AI 분석 버튼 (Figma 코드 없을 때) */}
-                  {!selectedRef.figmaCode && selectedRef.thumbnail && (
-                    <button
-                      style={{
-                        ...styles.generateAIButton,
-                        ...(isGeneratingForExisting ? styles.generateAIButtonDisabled : {}),
-                      }}
-                      onClick={() => handleGenerateForExisting(selectedRef)}
-                      disabled={isGeneratingForExisting}
-                    >
-                      {isGeneratingForExisting ? (
-                        <>
-                          <span style={styles.btnSpinner}></span>
-                          Generating Figma Code...
-                        </>
-                      ) : (
-                        <>◫ Generate Figma Code</>
-                      )}
-                    </button>
-                  )}
-                  
-                  {selectedRef.figmaCode && (
-                    <div style={styles.detailFigmaSection}>
-                      <div style={styles.detailFigmaHeader}>
-                        <span style={styles.detailFigmaTitle}>◫ Figma Plugin Code</span>
-                        <button style={styles.detailCopyButton} onClick={() => copyToClipboard(selectedRef.figmaCode)}>
-                          {copySuccess ? '✓ Copied!' : 'Copy Code'}
-                        </button>
-                      </div>
-                      <pre style={styles.detailFigmaCode}>{selectedRef.figmaCode.slice(0, 500)}...</pre>
-                    </div>
-                  )}
-                  
+
+                  {/* Figma 코드 생성/표시 */}
+                  <div style={styles.figmaSection}>
+                    {selectedRef.images[selectedImageIndex]?.figmaCode ? (
+                      <>
+                        <div style={styles.figmaHeader}>
+                          <span>◫ Figma Code</span>
+                          <button
+                            style={styles.copyBtn}
+                            onClick={() => copyToClipboard(selectedRef.images[selectedImageIndex].figmaCode)}
+                          >
+                            Copy
+                          </button>
+                        </div>
+                        <pre style={styles.figmaCode}>
+                          {selectedRef.images[selectedImageIndex].figmaCode.slice(0, 300)}...
+                        </pre>
+                      </>
+                    ) : (
+                      <button
+                        style={{ ...styles.generateBtn, ...(isGenerating ? styles.generateBtnDisabled : {}) }}
+                        onClick={() => handleGenerateFigma(selectedRef.id, selectedRef.images[selectedImageIndex].id)}
+                        disabled={isGenerating}
+                      >
+                        {isGenerating === selectedRef.images[selectedImageIndex]?.id ? (
+                          <><span style={styles.spinner}></span> Generating...</>
+                        ) : (
+                          '◫ Generate Figma Code'
+                        )}
+                      </button>
+                    )}
+                  </div>
+
                   <div style={styles.modalFooter}>
-                    <span style={styles.modalDate}>Added {selectedRef.addedAt}</span>
+                    <span>{selectedRef.addedAt}</span>
                     <div style={styles.modalActions}>
-                      <button style={styles.editButton} onClick={() => openEditModal(selectedRef)}>
+                      <button style={styles.editBtn} onClick={() => { setEditRef({...selectedRef}); setIsEditModalOpen(true); }}>
                         ✎ Edit
                       </button>
-                      <button style={styles.deleteButton} onClick={() => handleDeleteReference(selectedRef.id)}>
+                      <button style={styles.deleteBtn} onClick={() => handleDeleteReference(selectedRef.id)}>
                         Delete
                       </button>
                     </div>
@@ -805,332 +518,281 @@ const copyToClipboard = async (text) => {
 
           {/* Add Modal */}
           {isAddModalOpen && (
-            <div style={styles.modalOverlay} onClick={closeAddModal}>
+            <div style={styles.modalOverlay} onClick={() => setIsAddModalOpen(false)}>
               <div style={styles.addModal} onClick={e => e.stopPropagation()}>
-                <button style={styles.modalClose} onClick={closeAddModal}>✕</button>
-                <h2 style={styles.addModalTitle}>Add New Reference</h2>
-                
-                <div style={styles.addModalGrid}>
-                  <div style={styles.addModalForm}>
-                    {/* Type Selector */}
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Type *</label>
-                      <div style={styles.typeSelector}>
-                        <button
-                          type="button"
-                          onClick={() => setNewRef({...newRef, type: 'website', category: 'landing'})}
-                          style={{
-                            ...styles.typeSelectorButton,
-                            ...(newRef.type === 'website' ? styles.typeSelectorButtonActive : {}),
-                          }}
-                        >
-                          ◎ Website
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setNewRef({...newRef, type: 'component', category: 'navigation'})}
-                          style={{
-                            ...styles.typeSelectorButton,
-                            ...(newRef.type === 'component' ? styles.typeSelectorButtonActive : {}),
-                          }}
-                        >
-                          ◫ Component
-                        </button>
-                      </div>
-                    </div>
+                <button style={styles.modalClose} onClick={() => setIsAddModalOpen(false)}>✕</button>
+                <h2 style={styles.modalTitle}>Add New Reference</h2>
 
-                    {/* Image Upload */}
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>
-                        Screenshot
-                        <span style={styles.formLabelHint}> (Auto-generates Figma code)</span>
-                      </label>
-                      <div
-                        style={{
-                          ...styles.imageDropZone,
-                          ...(imagePreview ? styles.imageDropZoneWithPreview : {}),
-                          ...(isAnalyzing ? styles.imageDropZoneAnalyzing : {}),
-                        }}
-                        onDrop={handleDrop}
-                        onDragOver={(e) => e.preventDefault()}
-                        onClick={() => !isAnalyzing && document.getElementById('refImageInput').click()}
-                      >
-                        {imagePreview ? (
-                          <div style={styles.imagePreviewWrapper}>
-                            <img src={imagePreview} alt="Preview" style={styles.imagePreviewThumb} />
-                            {isAnalyzing && (
-                              <div style={styles.analyzingOverlay}>
-                                <span style={styles.analyzingSpinner}></span>
-                                <span style={styles.analyzingText}>Analyzing with AI...</span>
-                              </div>
-                            )}
-                            {!isAnalyzing && (
-                              <button style={styles.removeImageBtn} onClick={(e) => { e.stopPropagation(); resetImageUpload(); }}>✕</button>
-                            )}
-                            {figmaCode && !isAnalyzing && (
-                              <div style={styles.figmaBadge}>
-                                <span>✓</span> Figma code ready
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div style={styles.imageDropContent}>
-                            <span style={styles.imageDropIcon}>↑</span>
-                            <p style={styles.imageDropText}>Drop image or click to upload</p>
-                          </div>
-                        )}
-                        <input id="refImageInput" type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                      </div>
-                      
-                      {/* Generate Figma Code 버튼 */}
-                      {imagePreview && !figmaCode && (
-                        <button
-                          style={{
-                            ...styles.generateFigmaBtn,
-                            ...(isAnalyzing ? styles.generateFigmaBtnDisabled : {}),
-                          }}
-                          onClick={handleGenerateFigmaCode}
-                          disabled={isAnalyzing}
-                        >
-                          {isAnalyzing ? (
-                            <>
-                              <span style={styles.btnSpinner}></span>
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <span>◫</span> Generate Figma Code
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Title *</label>
-                      <input
-                        type="text"
-                        value={newRef.title}
-                        onChange={e => setNewRef({...newRef, title: e.target.value})}
-                        placeholder="e.g., Linear Homepage"
-                        style={styles.formInput}
-                      />
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>URL</label>
-                      <input
-                        type="url"
-                        value={newRef.url}
-                        onChange={e => setNewRef({...newRef, url: e.target.value})}
-                        placeholder="https://example.com (optional)"
-                        style={styles.formInput}
-                      />
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Category</label>
-                      <select
-                        value={newRef.category}
-                        onChange={e => setNewRef({...newRef, category: e.target.value})}
-                        style={styles.formSelect}
-                      >
-                        {CATEGORIES[newRef.type]?.filter(c => c.id !== 'all').map(cat => (
-                          <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Color</label>
-                      <div style={styles.colorPicker}>
-                        {COLORS.filter(c => c.id !== 'all').map(c => (
-                          <button
-                            key={c.id}
-                            style={{
-                              ...styles.colorButton,
-                              background: c.color,
-                              border: c.id === 'white' ? '1px solid #ddd' : 'none',
-                              ...(newRef.color === c.id ? styles.colorButtonActive : {}),
-                            }}
-                            onClick={(e) => { e.preventDefault(); setNewRef({...newRef, color: c.id}); }}
-                            title={c.name}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Tags</label>
-                      <input
-                        type="text"
-                        value={newRef.tags}
-                        onChange={e => setNewRef({...newRef, tags: e.target.value})}
-                        placeholder="minimal, dark, animation (comma separated)"
-                        style={styles.formInput}
-                      />
-                    </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Note</label>
-                      <textarea
-                        value={newRef.note}
-                        onChange={e => setNewRef({...newRef, note: e.target.value})}
-                        placeholder="What makes this reference interesting?"
-                        style={styles.formTextarea}
-                      />
-                    </div>
-
-                    <button 
-                      style={{
-                        ...styles.submitButton,
-                        ...(isAnalyzing ? styles.submitButtonDisabled : {}),
-                      }}
-                      onClick={handleAddReference}
-                      disabled={isAnalyzing}
+                {/* Type */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Type</label>
+                  <div style={styles.typeToggle}>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'website' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'website', category: 'landing' }))}
                     >
-                      {isAnalyzing ? 'Analyzing...' : 'Add Reference'}
+                      ◎ Website
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'component' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'component', category: 'navigation' }))}
+                    >
+                      ◫ Component
                     </button>
                   </div>
-
-                  {/* Figma Code Preview */}
-                  {figmaCode && (
-                    <div style={styles.figmaCodeSection}>
-                      <div style={styles.figmaCodeHeader}>
-                        <h3 style={styles.figmaCodeTitle}>
-                          <span style={styles.figmaCodeIcon}>◫</span>
-                          Figma Code
-                        </h3>
-                        <button
-                          style={{
-                            ...styles.copyCodeButton,
-                            ...(copySuccess ? styles.copyCodeButtonSuccess : {}),
-                          }}
-                          onClick={() => copyToClipboard()}
-                        >
-                          {copySuccess ? '✓ Copied!' : 'Copy'}
-                        </button>
-                      </div>
-                      <div style={styles.figmaCodeBox}>
-                        <pre style={styles.figmaCodePre}>{figmaCode}</pre>
-                      </div>
-                      <div style={styles.figmaCodeInstructions}>
-                        <p><strong>How to use:</strong></p>
-                        <p>1. Open Figma → Plugins → Development → Console</p>
-                        <p>2. Paste code and press Enter</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* Image Zoom Modal */}
-          {imageZoom && (
-            <div style={styles.zoomOverlay} onClick={() => setImageZoom(null)}>
-              <button style={styles.zoomClose} onClick={() => setImageZoom(null)}>✕</button>
-              <img src={imageZoom} alt="Zoomed" style={styles.zoomImage} />
+                {/* Images */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    Images {newRef.type === 'website' ? '(여러 장 가능)' : '(1장)'}
+                  </label>
+                  <div style={styles.imageUploadArea}>
+                    {newRef.images.map(img => (
+                      <div key={img.id} style={styles.uploadedImage}>
+                        <img src={img.src} alt="" style={styles.uploadedThumb} />
+                        <button style={styles.removeImgBtn} onClick={() => handleRemoveImage(img.id)}>✕</button>
+                        <input
+                          type="text"
+                          placeholder="이미지 설명..."
+                          value={img.note}
+                          onChange={e => handleImageNoteChange(img.id, e.target.value)}
+                          style={styles.imgNoteInput}
+                        />
+                      </div>
+                    ))}
+                    {(newRef.type === 'website' || newRef.images.length === 0) && (
+                      <label style={styles.addImageBtn}>
+                        + Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple={newRef.type === 'website'}
+                          onChange={e => handleImageUpload(e)}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Title *</label>
+                  <input
+                    type="text"
+                    value={newRef.title}
+                    onChange={e => setNewRef(p => ({ ...p, title: e.target.value }))}
+                    style={styles.input}
+                    placeholder="e.g., Linear Homepage"
+                  />
+                </div>
+
+                {/* URL */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>URL</label>
+                  <input
+                    type="url"
+                    value={newRef.url}
+                    onChange={e => setNewRef(p => ({ ...p, url: e.target.value }))}
+                    style={styles.input}
+                    placeholder="https://example.com"
+                  />
+                </div>
+
+                {/* Category */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Category</label>
+                  <select
+                    value={newRef.category}
+                    onChange={e => setNewRef(p => ({ ...p, category: e.target.value }))}
+                    style={styles.select}
+                  >
+                    {CATEGORIES[newRef.type]?.filter(c => c.id !== 'all').map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tags */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Tags</label>
+                  <div style={styles.tagsContainer}>
+                    {newRef.tags.map(tag => (
+                      <span key={tag} style={styles.tagChip}>
+                        #{tag}
+                        <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={styles.tagInputWrapper}>
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                      onFocus={() => setShowTagSuggestions(true)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput); } }}
+                      style={styles.input}
+                      placeholder="태그 입력 후 Enter"
+                    />
+                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                      <div style={styles.tagSuggestions}>
+                        {filteredTagSuggestions.map(tag => (
+                          <button key={tag} style={styles.tagSuggestion} onClick={() => handleAddTag(tag)}>
+                            #{tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button style={styles.submitBtn} onClick={handleAddReference}>
+                  Add Reference
+                </button>
+              </div>
             </div>
           )}
 
           {/* Edit Modal */}
           {isEditModalOpen && editRef && (
             <div style={styles.modalOverlay} onClick={() => setIsEditModalOpen(false)}>
-              <div style={styles.editModal} onClick={e => e.stopPropagation()}>
+              <div style={styles.addModal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
-                <h2 style={styles.addModalTitle}>Edit Reference</h2>
-                
-                <div style={styles.editModalForm}>
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>Type</label>
-                    <div style={styles.typeSelector}>
-                      <button
-                        type="button"
-                        onClick={() => setEditRef({...editRef, type: 'website', category: 'landing'})}
-                        style={{
-                          ...styles.typeSelectorButton,
-                          ...(editRef.type === 'website' ? styles.typeSelectorButtonActive : {}),
-                        }}
-                      >
-                        ◎ Website
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditRef({...editRef, type: 'component', category: 'navigation'})}
-                        style={{
-                          ...styles.typeSelectorButton,
-                          ...(editRef.type === 'component' ? styles.typeSelectorButtonActive : {}),
-                        }}
-                      >
-                        ◫ Component
-                      </button>
-                    </div>
-                  </div>
+                <h2 style={styles.modalTitle}>Edit Reference</h2>
 
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>Title *</label>
-                    <input
-                      type="text"
-                      value={editRef.title}
-                      onChange={e => setEditRef({...editRef, title: e.target.value})}
-                      style={styles.formInput}
-                    />
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>URL</label>
-                    <input
-                      type="url"
-                      value={editRef.url || ''}
-                      onChange={e => setEditRef({...editRef, url: e.target.value})}
-                      style={styles.formInput}
-                    />
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>Category</label>
-                    <select
-                      value={editRef.category}
-                      onChange={e => setEditRef({...editRef, category: e.target.value})}
-                      style={styles.formSelect}
+                {/* Type */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Type</label>
+                  <div style={styles.typeToggle}>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'website' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'website' }))}
                     >
-                      {CATEGORIES[editRef.type]?.filter(c => c.id !== 'all').map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>Tags</label>
-                    <input
-                      type="text"
-                      value={editRef.tags}
-                      onChange={e => setEditRef({...editRef, tags: e.target.value})}
-                      placeholder="minimal, dark, animation (comma separated)"
-                      style={styles.formInput}
-                    />
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>Note</label>
-                    <textarea
-                      value={editRef.note || ''}
-                      onChange={e => setEditRef({...editRef, note: e.target.value})}
-                      style={styles.formTextarea}
-                    />
-                  </div>
-
-                  <div style={styles.editModalButtons}>
-                    <button style={styles.cancelButton} onClick={() => setIsEditModalOpen(false)}>
-                      Cancel
+                      ◎ Website
                     </button>
-                    <button style={styles.saveButton} onClick={handleSaveEdit}>
-                      Save Changes
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'component' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'component' }))}
+                    >
+                      ◫ Component
                     </button>
                   </div>
                 </div>
+
+                {/* Images */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Images</label>
+                  <div style={styles.imageUploadArea}>
+                    {editRef.images.map(img => (
+                      <div key={img.id} style={styles.uploadedImage}>
+                        <img src={img.src} alt="" style={styles.uploadedThumb} />
+                        <button style={styles.removeImgBtn} onClick={() => handleRemoveImage(img.id, true)}>✕</button>
+                        <input
+                          type="text"
+                          placeholder="이미지 설명..."
+                          value={img.note}
+                          onChange={e => handleImageNoteChange(img.id, e.target.value, true)}
+                          style={styles.imgNoteInput}
+                        />
+                      </div>
+                    ))}
+                    {(editRef.type === 'website' || editRef.images.length === 0) && (
+                      <label style={styles.addImageBtn}>
+                        + Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple={editRef.type === 'website'}
+                          onChange={e => handleImageUpload(e, true)}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Title *</label>
+                  <input
+                    type="text"
+                    value={editRef.title}
+                    onChange={e => setEditRef(p => ({ ...p, title: e.target.value }))}
+                    style={styles.input}
+                  />
+                </div>
+
+                {/* URL */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>URL</label>
+                  <input
+                    type="url"
+                    value={editRef.url || ''}
+                    onChange={e => setEditRef(p => ({ ...p, url: e.target.value }))}
+                    style={styles.input}
+                  />
+                </div>
+
+                {/* Category */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Category</label>
+                  <select
+                    value={editRef.category}
+                    onChange={e => setEditRef(p => ({ ...p, category: e.target.value }))}
+                    style={styles.select}
+                  >
+                    {CATEGORIES[editRef.type]?.filter(c => c.id !== 'all').map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tags */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Tags</label>
+                  <div style={styles.tagsContainer}>
+                    {editRef.tags?.map(tag => (
+                      <span key={tag} style={styles.tagChip}>
+                        #{tag}
+                        <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag, true)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={styles.tagInputWrapper}>
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                      onFocus={() => setShowTagSuggestions(true)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput, true); } }}
+                      style={styles.input}
+                      placeholder="태그 입력 후 Enter"
+                    />
+                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                      <div style={styles.tagSuggestions}>
+                        {filteredTagSuggestions.map(tag => (
+                          <button key={tag} style={styles.tagSuggestion} onClick={() => handleAddTag(tag, true)}>
+                            #{tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.editBtns}>
+                  <button style={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>Cancel</button>
+                  <button style={styles.submitBtn} onClick={handleSaveEdit}>Save Changes</button>
+                </div>
               </div>
+            </div>
+          )}
+
+          {/* Image Zoom */}
+          {imageZoom && (
+            <div style={styles.zoomOverlay} onClick={() => setImageZoom(null)}>
+              <img src={imageZoom} alt="" style={styles.zoomImage} />
             </div>
           )}
         </div>
@@ -1138,1017 +800,80 @@ const copyToClipboard = async (text) => {
     }
 
     const styles = {
-      container: {
-        minHeight: '100vh',
-        position: 'relative',
-        overflow: 'hidden',
-      },
-      bgGradient1: {
-        position: 'fixed',
-        top: '-20%',
-        right: '-10%',
-        width: '60vw',
-        height: '60vw',
-        background: 'radial-gradient(circle, rgba(255,200,150,0.15) 0%, transparent 70%)',
-        borderRadius: '50%',
-        pointerEvents: 'none',
-        animation: 'float 20s ease-in-out infinite',
-      },
-      bgGradient2: {
-        position: 'fixed',
-        bottom: '-30%',
-        left: '-20%',
-        width: '80vw',
-        height: '80vw',
-        background: 'radial-gradient(circle, rgba(150,180,255,0.1) 0%, transparent 70%)',
-        borderRadius: '50%',
-        pointerEvents: 'none',
-        animation: 'float 25s ease-in-out infinite reverse',
-      },
-      gridOverlay: {
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundImage: 'linear-gradient(rgba(0,0,0,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.015) 1px, transparent 1px)',
-        backgroundSize: '60px 60px',
-        pointerEvents: 'none',
-      },
-      header: {
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        background: 'rgba(250,251,252,0.8)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(0,0,0,0.05)',
-      },
-      headerInner: {
-        maxWidth: '1400px',
-        margin: '0 auto',
-        padding: '20px 40px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      },
-      logo: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-      },
-      logoIcon: {
-        fontSize: '28px',
-        color: '#1a1a2e',
-      },
-      logoText: {
-        fontFamily: '"Space Grotesk", sans-serif',
-        fontSize: '26px',
-        fontWeight: '700',
-        color: '#1a1a2e',
-        letterSpacing: '-0.5px',
-      },
-      logoBadge: {
-        fontSize: '11px',
-        fontWeight: '500',
-        color: '#888',
-        background: 'rgba(0,0,0,0.04)',
-        padding: '4px 10px',
-        borderRadius: '20px',
-        letterSpacing: '0.5px',
-        textTransform: 'uppercase',
-      },
-      addButton: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '12px 24px',
-        background: '#1a1a2e',
-        color: '#fff',
-        border: 'none',
-        borderRadius: '12px',
-        fontSize: '14px',
-        fontWeight: '600',
-        fontFamily: '"Outfit", sans-serif',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-      },
-      addButtonIcon: {
-        fontSize: '18px',
-        fontWeight: '400',
-      },
-      filterSection: {
-        maxWidth: '1400px',
-        margin: '0 auto',
-        padding: '40px 40px 20px',
-      },
-      typeToggle: {
-        display: 'flex',
-        gap: '12px',
-        marginBottom: '28px',
-      },
-      typeButton: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        padding: '14px 24px',
-        background: '#fff',
-        border: '2px solid rgba(0,0,0,0.06)',
-        borderRadius: '14px',
-        fontSize: '15px',
-        fontWeight: '600',
-        fontFamily: '"Outfit", sans-serif',
-        color: '#555',
-        cursor: 'pointer',
-        transition: 'all 0.25s ease',
-      },
-      typeButtonActive: {
-        background: '#1a1a2e',
-        borderColor: '#1a1a2e',
-        color: '#fff',
-      },
-      typeCount: {
-        fontSize: '12px',
-        fontWeight: '500',
-        background: 'rgba(0,0,0,0.08)',
-        padding: '2px 8px',
-        borderRadius: '10px',
-      },
-      searchWrapper: {
-        position: 'relative',
-        maxWidth: '600px',
-        marginBottom: '30px',
-      },
-      searchIcon: {
-        position: 'absolute',
-        left: '20px',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        fontSize: '20px',
-        color: '#999',
-      },
-      searchInput: {
-        width: '100%',
-        padding: '18px 50px 18px 50px',
-        fontSize: '16px',
-        fontFamily: '"Outfit", sans-serif',
-        border: '2px solid rgba(0,0,0,0.06)',
-        borderRadius: '16px',
-        background: '#fff',
-        outline: 'none',
-        transition: 'all 0.3s ease',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-      },
-      clearSearch: {
-        position: 'absolute',
-        right: '16px',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        background: 'rgba(0,0,0,0.05)',
-        border: 'none',
-        width: '24px',
-        height: '24px',
-        borderRadius: '50%',
-        cursor: 'pointer',
-        fontSize: '12px',
-        color: '#666',
-      },
-      categories: {
-        display: 'flex',
-        gap: '10px',
-        flexWrap: 'wrap',
-        marginBottom: '24px',
-      },
-      categoryButton: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '10px 18px',
-        background: '#fff',
-        border: '1.5px solid rgba(0,0,0,0.08)',
-        borderRadius: '10px',
-        fontSize: '14px',
-        fontWeight: '500',
-        fontFamily: '"Outfit", sans-serif',
-        color: '#555',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-      },
-      categoryButtonActive: {
-        background: '#1a1a2e',
-        borderColor: '#1a1a2e',
-        color: '#fff',
-      },
-      tagsSection: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        flexWrap: 'wrap',
-      },
-      tagsLabel: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#999',
-        textTransform: 'uppercase',
-        letterSpacing: '1px',
-      },
-      tagsList: {
-        display: 'flex',
-        gap: '8px',
-        flexWrap: 'wrap',
-      },
-      tagButton: {
-        padding: '6px 14px',
-        background: 'transparent',
-        border: '1px dashed rgba(0,0,0,0.15)',
-        borderRadius: '20px',
-        fontSize: '13px',
-        fontFamily: '"Outfit", sans-serif',
-        color: '#666',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-      },
-      tagButtonActive: {
-        background: 'rgba(26,26,46,0.08)',
-        borderStyle: 'solid',
-        borderColor: '#1a1a2e',
-        color: '#1a1a2e',
-      },
-      clearTags: {
-        padding: '6px 12px',
-        background: 'transparent',
-        border: 'none',
-        fontSize: '12px',
-        fontFamily: '"Outfit", sans-serif',
-        color: '#999',
-        cursor: 'pointer',
-        textDecoration: 'underline',
-      },
-      resultsCount: {
-        maxWidth: '1400px',
-        margin: '0 auto',
-        padding: '0 40px 20px',
-        display: 'flex',
-        alignItems: 'baseline',
-        gap: '8px',
-      },
-      resultsNumber: {
-        fontFamily: '"Space Grotesk", sans-serif',
-        fontSize: '42px',
-        fontWeight: '700',
-        color: '#1a1a2e',
-      },
-      resultsText: {
-        fontSize: '16px',
-        color: '#888',
-      },
-      grid: {
-        maxWidth: '1400px',
-        margin: '0 auto',
-        padding: '0 40px 80px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-        gap: '28px',
-      },
-      card: {
-        background: '#fff',
-        borderRadius: '20px',
-        overflow: 'hidden',
-        cursor: 'pointer',
-        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-        animation: 'fadeInUp 0.6s ease forwards',
-        opacity: 0,
-      },
-      cardImageWrapper: {
-        position: 'relative',
-        aspectRatio: '16/10',
-        overflow: 'hidden',
-      },
-      cardImage: {
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover',
-        transition: 'transform 0.6s ease',
-      },
-      cardOverlay: {
-        position: 'absolute',
-        inset: 0,
-        background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.6) 100%)',
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
-        padding: '20px',
-        opacity: 0,
-        transition: 'opacity 0.3s ease',
-      },
-      viewButton: {
-        color: '#fff',
-        fontSize: '14px',
-        fontWeight: '500',
-        padding: '10px 20px',
-        background: 'rgba(255,255,255,0.2)',
-        borderRadius: '8px',
-        backdropFilter: 'blur(10px)',
-      },
-      cardCategory: {
-        position: 'absolute',
-        top: '14px',
-        left: '14px',
-        padding: '6px 12px',
-        background: 'rgba(255,255,255,0.95)',
-        borderRadius: '8px',
-        fontSize: '12px',
-        fontWeight: '600',
-        color: '#1a1a2e',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-      },
-      cardTypeBadge: {
-        position: 'absolute',
-        top: '14px',
-        right: '14px',
-        padding: '5px 10px',
-        background: 'rgba(99,102,241,0.9)',
-        borderRadius: '6px',
-        fontSize: '11px',
-        fontWeight: '600',
-        color: '#fff',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-      },
-      cardFigmaBadge: {
-        position: 'absolute',
-        bottom: '14px',
-        right: '14px',
-        width: '28px',
-        height: '28px',
-        background: 'rgba(34,197,94,0.9)',
-        borderRadius: '50%',
-        fontSize: '14px',
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      },
-      cardContent: {
-        padding: '20px',
-      },
-      cardTitle: {
-        fontFamily: '"Space Grotesk", sans-serif',
-        fontSize: '18px',
-        fontWeight: '600',
-        color: '#1a1a2e',
-        marginBottom: '6px',
-      },
-      cardUrl: {
-        fontSize: '13px',
-        color: '#888',
-        marginBottom: '14px',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      },
-      cardTags: {
-        display: 'flex',
-        gap: '6px',
-        flexWrap: 'wrap',
-      },
-      cardTag: {
-        fontSize: '12px',
-        color: '#666',
-        background: 'rgba(0,0,0,0.04)',
-        padding: '4px 10px',
-        borderRadius: '6px',
-      },
-      cardTagMore: {
-        fontSize: '12px',
-        color: '#999',
-        padding: '4px 8px',
-      },
-      emptyState: {
-        textAlign: 'center',
-        padding: '80px 40px',
-      },
-      emptyIcon: {
-        fontSize: '64px',
-        color: '#ddd',
-        display: 'block',
-        marginBottom: '20px',
-      },
-      emptyText: {
-        fontFamily: '"Space Grotesk", sans-serif',
-        fontSize: '24px',
-        fontWeight: '600',
-        color: '#1a1a2e',
-        marginBottom: '8px',
-      },
-      emptySubtext: {
-        fontSize: '16px',
-        color: '#888',
-      },
-      modalOverlay: {
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '40px',
-      },
-      modal: {
-        background: '#fff',
-        borderRadius: '24px',
-        maxWidth: '95vw',
-        width: '1200px',
-        maxHeight: '95vh',
-        overflow: 'auto',
-        position: 'relative',
-      },
-      modalClose: {
-        position: 'absolute',
-        top: '16px',
-        right: '16px',
-        width: '36px',
-        height: '36px',
-        background: 'rgba(255,255,255,0.9)',
-        border: 'none',
-        borderRadius: '50%',
-        fontSize: '16px',
-        cursor: 'pointer',
-        zIndex: 10,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-      },
-      modalImage: {
-        width: '100%',
-        maxHeight: '500px',
-        objectFit: 'contain',
-        background: '#f5f5f5',
-        cursor: 'zoom-in',
-      },
-      modalContent: {
-        padding: '30px',
-      },
-      modalMeta: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        marginBottom: '12px',
-      },
-      modalType: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#6366f1',
-      },
-      modalDivider: {
-        color: '#ccc',
-      },
-      modalCategory: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#888',
-      },
-      figmaReadyBadge: {
-        color: '#22c55e',
-        fontWeight: '600',
-      },
-      modalTitle: {
-        fontFamily: '"Space Grotesk", sans-serif',
-        fontSize: '28px',
-        fontWeight: '700',
-        color: '#1a1a2e',
-        marginBottom: '12px',
-      },
-      modalUrl: {
-        display: 'inline-block',
-        fontSize: '15px',
-        color: '#1a1a2e',
-        textDecoration: 'none',
-        padding: '10px 16px',
-        background: 'rgba(0,0,0,0.04)',
-        borderRadius: '10px',
-        marginBottom: '20px',
-      },
-      modalNote: {
-        fontSize: '16px',
-        lineHeight: '1.7',
-        color: '#555',
-        marginBottom: '20px',
-        padding: '16px',
-        background: 'rgba(0,0,0,0.02)',
-        borderRadius: '12px',
-        borderLeft: '3px solid #1a1a2e',
-      },
-      modalTags: {
-        display: 'flex',
-        gap: '8px',
-        flexWrap: 'wrap',
-        marginBottom: '24px',
-      },
-      modalTag: {
-        fontSize: '14px',
-        color: '#555',
-        background: 'rgba(0,0,0,0.05)',
-        padding: '8px 14px',
-        borderRadius: '8px',
-      },
-      detailFigmaSection: {
-        marginTop: '20px',
-        background: '#1a1a2e',
-        borderRadius: '12px',
-        padding: '16px',
-        marginBottom: '20px',
-      },
-      detailFigmaHeader: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '12px',
-      },
-      detailFigmaTitle: {
-        color: '#fff',
-        fontSize: '14px',
-        fontWeight: '600',
-      },
-      detailCopyButton: {
-        padding: '6px 14px',
-        background: 'rgba(255,255,255,0.1)',
-        border: '1px solid rgba(255,255,255,0.2)',
-        borderRadius: '6px',
-        color: '#fff',
-        fontSize: '12px',
-        cursor: 'pointer',
-      },
-      detailFigmaCode: {
-        background: 'rgba(0,0,0,0.3)',
-        borderRadius: '8px',
-        padding: '12px',
-        margin: 0,
-        fontSize: '11px',
-        fontFamily: '"SF Mono", monospace',
-        color: '#94a3b8',
-        lineHeight: '1.5',
-        maxHeight: '120px',
-        overflow: 'auto',
-        whiteSpace: 'pre-wrap',
-      },
-      modalFooter: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingTop: '20px',
-        borderTop: '1px solid rgba(0,0,0,0.06)',
-      },
-      modalDate: {
-        fontSize: '13px',
-        color: '#999',
-      },
-      deleteButton: {
-        padding: '10px 20px',
-        background: 'transparent',
-        border: '1.5px solid #ff4757',
-        borderRadius: '10px',
-        color: '#ff4757',
-        fontSize: '14px',
-        fontWeight: '500',
-        fontFamily: '"Outfit", sans-serif',
-        cursor: 'pointer',
-      },
-      addModal: {
-        background: '#fff',
-        borderRadius: '24px',
-        maxWidth: '900px',
-        width: '100%',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        position: 'relative',
-        padding: '40px',
-      },
-      addModalTitle: {
-        fontFamily: '"Space Grotesk", sans-serif',
-        fontSize: '26px',
-        fontWeight: '700',
-        color: '#1a1a2e',
-        marginBottom: '30px',
-      },
-      addModalGrid: {
-        display: 'flex',
-        gap: '24px',
-      },
-      addModalForm: {
-        flex: '1',
-        minWidth: '320px',
-      },
-      formGroup: {
-        marginBottom: '20px',
-      },
-      formLabel: {
-        display: 'block',
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#555',
-        marginBottom: '8px',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-      },
-      formLabelHint: {
-        fontWeight: '400',
-        color: '#999',
-        fontSize: '11px',
-        textTransform: 'none',
-        letterSpacing: '0',
-      },
-      typeSelector: {
-        display: 'flex',
-        gap: '10px',
-      },
-      typeSelectorButton: {
-        flex: 1,
-        padding: '14px',
-        background: '#fff',
-        border: '2px solid rgba(0,0,0,0.08)',
-        borderRadius: '12px',
-        fontSize: '14px',
-        fontWeight: '600',
-        fontFamily: '"Outfit", sans-serif',
-        color: '#555',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-      },
-      typeSelectorButtonActive: {
-        background: '#1a1a2e',
-        borderColor: '#1a1a2e',
-        color: '#fff',
-      },
-      imageDropZone: {
-        border: '2px dashed rgba(0,0,0,0.12)',
-        borderRadius: '12px',
-        padding: '24px',
-        textAlign: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        background: 'rgba(0,0,0,0.02)',
-      },
-      imageDropZoneWithPreview: {
-        padding: '0',
-        border: '2px solid rgba(99,102,241,0.3)',
-      },
-      imageDropZoneAnalyzing: {
-        borderColor: 'rgba(99,102,241,0.5)',
-        background: 'rgba(99,102,241,0.05)',
-      },
-      imageDropContent: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '8px',
-      },
-      imageDropIcon: {
-        fontSize: '24px',
-        color: '#6366f1',
-        width: '48px',
-        height: '48px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(99,102,241,0.1)',
-        borderRadius: '50%',
-      },
-      imageDropText: {
-        fontSize: '14px',
-        color: '#666',
-      },
-      imagePreviewWrapper: {
-        position: 'relative',
-        width: '100%',
-      },
-      imagePreviewThumb: {
-        width: '100%',
-        height: '140px',
-        objectFit: 'cover',
-        borderRadius: '10px',
-      },
-      analyzingOverlay: {
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(99,102,241,0.9)',
-        borderRadius: '10px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '12px',
-      },
-      analyzingSpinner: {
-        width: '24px',
-        height: '24px',
-        border: '3px solid rgba(255,255,255,0.3)',
-        borderTopColor: '#fff',
-        borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite',
-      },
-      analyzingText: {
-        color: '#fff',
-        fontSize: '14px',
-        fontWeight: '600',
-      },
-      removeImageBtn: {
-        position: 'absolute',
-        top: '8px',
-        right: '8px',
-        width: '28px',
-        height: '28px',
-        background: 'rgba(0,0,0,0.6)',
-        border: 'none',
-        borderRadius: '50%',
-        color: '#fff',
-        fontSize: '12px',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      },
-      figmaBadge: {
-        position: 'absolute',
-        bottom: '8px',
-        left: '8px',
-        padding: '6px 12px',
-        background: 'rgba(34,197,94,0.9)',
-        borderRadius: '6px',
-        color: '#fff',
-        fontSize: '12px',
-        fontWeight: '600',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-      },
-      formInput: {
-        width: '100%',
-        padding: '14px 16px',
-        fontSize: '15px',
-        fontFamily: '"Outfit", sans-serif',
-        border: '2px solid rgba(0,0,0,0.08)',
-        borderRadius: '12px',
-        outline: 'none',
-      },
-      formSelect: {
-        width: '100%',
-        padding: '14px 16px',
-        fontSize: '15px',
-        fontFamily: '"Outfit", sans-serif',
-        border: '2px solid rgba(0,0,0,0.08)',
-        borderRadius: '12px',
-        outline: 'none',
-        background: '#fff',
-        cursor: 'pointer',
-      },
-      formTextarea: {
-        width: '100%',
-        padding: '14px 16px',
-        fontSize: '15px',
-        fontFamily: '"Outfit", sans-serif',
-        border: '2px solid rgba(0,0,0,0.08)',
-        borderRadius: '12px',
-        outline: 'none',
-        minHeight: '80px',
-        resize: 'vertical',
-      },
-      submitButton: {
-        width: '100%',
-        padding: '16px',
-        background: '#1a1a2e',
-        color: '#fff',
-        border: 'none',
-        borderRadius: '14px',
-        fontSize: '16px',
-        fontWeight: '600',
-        fontFamily: '"Outfit", sans-serif',
-        cursor: 'pointer',
-        marginTop: '10px',
-      },
-      submitButtonDisabled: {
-        background: '#ccc',
-        cursor: 'not-allowed',
-      },
-      figmaCodeSection: {
-        width: '380px',
-        background: '#1a1a2e',
-        borderRadius: '16px',
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-      },
-      figmaCodeHeader: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px',
-      },
-      figmaCodeTitle: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        color: '#fff',
-        fontSize: '15px',
-        fontWeight: '600',
-      },
-      figmaCodeIcon: {
-        color: '#6366f1',
-      },
-      copyCodeButton: {
-        padding: '8px 16px',
-        background: 'rgba(255,255,255,0.1)',
-        border: '1px solid rgba(255,255,255,0.2)',
-        borderRadius: '8px',
-        color: '#fff',
-        fontSize: '13px',
-        fontWeight: '500',
-        cursor: 'pointer',
-      },
-      copyCodeButtonSuccess: {
-        background: 'rgba(34,197,94,0.2)',
-        borderColor: 'rgba(34,197,94,0.4)',
-        color: '#22c55e',
-      },
-      figmaCodeBox: {
-        flex: 1,
-        overflow: 'auto',
-        background: 'rgba(0,0,0,0.3)',
-        borderRadius: '10px',
-        marginBottom: '16px',
-        maxHeight: '300px',
-      },
-      figmaCodePre: {
-        padding: '16px',
-        margin: 0,
-        fontSize: '11px',
-        fontFamily: '"SF Mono", "Fira Code", monospace',
-        color: '#e2e8f0',
-        lineHeight: '1.5',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-      },
-      figmaCodeInstructions: {
-        fontSize: '12px',
-        color: 'rgba(255,255,255,0.6)',
-        lineHeight: '1.6',
-      },
-      colorPicker: {
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px',
-      },
-      colorButton: {
-        width: '28px',
-        height: '28px',
-        borderRadius: '50%',
-        cursor: 'pointer',
-        transition: 'transform 0.2s',
-      },
-      colorButtonActive: {
-        transform: 'scale(1.2)',
-        boxShadow: '0 0 0 3px rgba(99,102,241,0.5)',
-      },
-      generateFigmaBtn: {
-        width: '100%',
-        padding: '12px 16px',
-        marginTop: '12px',
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-        color: '#fff',
-        border: 'none',
-        borderRadius: '10px',
-        fontSize: '14px',
-        fontWeight: '600',
-        fontFamily: '"Outfit", sans-serif',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '8px',
-        transition: 'all 0.2s ease',
-      },
-      generateFigmaBtnDisabled: {
-        background: '#a5a6f6',
-        cursor: 'not-allowed',
-      },
-      btnSpinner: {
-        width: '14px',
-        height: '14px',
-        border: '2px solid rgba(255,255,255,0.3)',
-        borderTopColor: '#fff',
-        borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite',
-      },
-      zoomOverlay: {
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.95)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 2000,
-        cursor: 'zoom-out',
-      },
-      zoomImage: {
-        maxWidth: '95vw',
-        maxHeight: '95vh',
-        objectFit: 'contain',
-      },
-      zoomClose: {
-        position: 'absolute',
-        top: '20px',
-        right: '20px',
-        width: '44px',
-        height: '44px',
-        background: 'rgba(255,255,255,0.1)',
-        border: 'none',
-        borderRadius: '50%',
-        color: '#fff',
-        fontSize: '20px',
-        cursor: 'pointer',
-      },
-      modalActions: {
-        display: 'flex',
-        gap: '8px',
-      },
-      editButton: {
-        padding: '8px 16px',
-        background: '#f0f0f5',
-        border: 'none',
-        borderRadius: '8px',
-        color: '#555',
-        fontSize: '13px',
-        fontWeight: '500',
-        cursor: 'pointer',
-        fontFamily: '"Outfit", sans-serif',
-      },
-      generateAIButton: {
-        width: '100%',
-        padding: '14px 20px',
-        marginTop: '16px',
-        marginBottom: '16px',
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-        color: '#fff',
-        border: 'none',
-        borderRadius: '12px',
-        fontSize: '15px',
-        fontWeight: '600',
-        fontFamily: '"Outfit", sans-serif',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '8px',
-      },
-      generateAIButtonDisabled: {
-        background: '#a5a6f6',
-        cursor: 'not-allowed',
-      },
-      editModal: {
-        background: '#fff',
-        borderRadius: '20px',
-        maxWidth: '500px',
-        width: '100%',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        position: 'relative',
-        padding: '30px',
-      },
-      editModalForm: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-      },
-      editModalButtons: {
-        display: 'flex',
-        gap: '12px',
-        marginTop: '8px',
-      },
-      cancelButton: {
-        flex: 1,
-        padding: '12px 20px',
-        background: '#f0f0f5',
-        border: 'none',
-        borderRadius: '10px',
-        color: '#555',
-        fontSize: '14px',
-        fontWeight: '500',
-        cursor: 'pointer',
-        fontFamily: '"Outfit", sans-serif',
-      },
-      saveButton: {
-        flex: 1,
-        padding: '12px 20px',
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-        border: 'none',
-        borderRadius: '10px',
-        color: '#fff',
-        fontSize: '14px',
-        fontWeight: '600',
-        cursor: 'pointer',
-        fontFamily: '"Outfit", sans-serif',
-      },
+      container: { minHeight: '100vh', padding: '20px' },
+      header: { maxWidth: '1400px', margin: '0 auto 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+      headerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+      logo: { display: 'flex', alignItems: 'center', gap: '8px' },
+      logoIcon: { fontSize: '28px', color: '#6366f1' },
+      logoText: { fontSize: '24px', fontWeight: '700', fontFamily: '"Space Grotesk", sans-serif' },
+      addButton: { padding: '10px 20px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      filterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' },
+      typeToggle: { display: 'flex', gap: '8px' },
+      typeButton: { padding: '8px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif', fontSize: '14px' },
+      typeButtonActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
+      searchInput: { padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', width: '200px', fontFamily: '"Outfit", sans-serif' },
+      categoryFilter: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      catButton: { padding: '6px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      catButtonActive: { background: '#f0f0ff', borderColor: '#6366f1', color: '#6366f1' },
+      grid: { maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
+      card: { background: '#fff', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', transition: 'transform 0.2s, box-shadow 0.2s' },
+      cardImageWrapper: { position: 'relative', aspectRatio: '16/10', overflow: 'hidden' },
+      cardImage: { width: '100%', height: '100%', objectFit: 'cover' },
+      imageCount: { position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' },
+      figmaBadge: { position: 'absolute', bottom: '8px', right: '8px', background: '#6366f1', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' },
+      cardContent: { padding: '16px' },
+      cardTitle: { fontSize: '16px', fontWeight: '600', marginBottom: '8px', fontFamily: '"Space Grotesk", sans-serif' },
+      cardTags: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
+      cardTag: { fontSize: '12px', color: '#6366f1', background: '#f0f0ff', padding: '2px 8px', borderRadius: '4px' },
+      modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
+      modal: { background: '#fff', borderRadius: '20px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflow: 'auto', position: 'relative' },
+      addModal: { background: '#fff', borderRadius: '20px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '30px', position: 'relative' },
+      modalClose: { position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', background: '#f5f5f5', border: 'none', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', zIndex: 10 },
+      imageGallery: { position: 'relative' },
+      modalImage: { width: '100%', maxHeight: '400px', objectFit: 'contain', background: '#f5f5f5', cursor: 'zoom-in' },
+      imageThumbs: { display: 'flex', gap: '8px', padding: '12px', background: '#f9f9f9', overflowX: 'auto' },
+      thumbImg: { width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px', cursor: 'pointer', opacity: 0.6, transition: 'opacity 0.2s' },
+      thumbImgActive: { opacity: 1, boxShadow: '0 0 0 2px #6366f1' },
+      modalContent: { padding: '24px' },
+      modalMeta: { display: 'flex', gap: '8px', alignItems: 'center', color: '#888', fontSize: '14px', marginBottom: '8px' },
+      modalType: { color: '#6366f1', fontWeight: '600' },
+      modalTitle: { fontSize: '24px', fontWeight: '700', marginBottom: '12px', fontFamily: '"Space Grotesk", sans-serif' },
+      modalUrl: { display: 'inline-block', color: '#6366f1', fontSize: '14px', marginBottom: '12px', textDecoration: 'none' },
+      modalNote: { color: '#555', fontSize: '15px', lineHeight: 1.6, marginBottom: '16px', padding: '12px', background: '#f9f9f9', borderRadius: '8px' },
+      modalTags: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' },
+      modalTag: { fontSize: '13px', color: '#6366f1', background: '#f0f0ff', padding: '4px 12px', borderRadius: '6px' },
+      figmaSection: { marginBottom: '20px' },
+      figmaHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
+      copyBtn: { padding: '6px 12px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' },
+      figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace', overflow: 'auto', maxHeight: '150px' },
+      generateBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' },
+      generateBtnDisabled: { background: '#a5a6f6', cursor: 'not-allowed' },
+      spinner: { width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+      modalFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #eee' },
+      modalActions: { display: 'flex', gap: '8px' },
+      editBtn: { padding: '8px 16px', background: '#f0f0f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      deleteBtn: { padding: '8px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      formGroup: { marginBottom: '20px' },
+      label: { display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#333' },
+      input: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
+      select: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
+      imageUploadArea: { display: 'flex', flexWrap: 'wrap', gap: '12px' },
+      uploadedImage: { position: 'relative', width: '120px' },
+      uploadedThumb: { width: '120px', height: '80px', objectFit: 'cover', borderRadius: '8px' },
+      removeImgBtn: { position: 'absolute', top: '-6px', right: '-6px', width: '20px', height: '20px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', cursor: 'pointer', fontSize: '12px' },
+      imgNoteInput: { width: '100%', marginTop: '4px', padding: '6px', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '11px' },
+      addImageBtn: { width: '120px', height: '80px', border: '2px dashed #d1d5db', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      tagsContainer: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' },
+      tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f0ff', color: '#6366f1', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
+      tagRemove: { background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '16px', padding: 0 },
+      tagInputWrapper: { position: 'relative' },
+      tagSuggestions: { position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto' },
+      tagSuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      submitBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', fontFamily: '"Outfit", sans-serif' },
+      editBtns: { display: 'flex', gap: '12px' },
+      cancelBtn: { flex: 1, padding: '14px', background: '#f0f0f5', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
+      zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
     };
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
