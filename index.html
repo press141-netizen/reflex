@@ -4,17 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reflex - Designer's Archive</title>
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Outfit', sans-serif; background: linear-gradient(180deg, #FAFBFC 0%, #F5F7FA 50%, #EEF2F7 100%); min-height: 100vh; }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    /* 코드 블록 스크롤바 스타일 */
+    pre::-webkit-scrollbar { width: 8px; height: 8px; }
+    pre::-webkit-scrollbar-thumb { background: #4b5563; borderRadius: 4px; }
+    pre::-webkit-scrollbar-track { background: #1e1e2e; }
   </style>
 </head>
 <body>
@@ -38,51 +45,51 @@
       component: ['Navigation', 'Hero', 'Button', 'Card', 'Form', 'Modal', 'Sidebar', 'Footer'],
     };
 
-    // 새로운 데이터 구조: images 배열 (각 이미지별 note, figmaCode, isComponent)
-    const DEFAULT_REFERENCES = [
-      {
-        id: 1,
-        type: 'web',
-        title: 'Linear Homepage',
-        url: 'https://linear.app',
-        images: [
-          { id: 'img1', src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop', note: '메인 히어로 섹션', figmaCode: null, isComponent: false },
-        ],
-        category: 'landing',
-        tags: ['minimal', 'dark', 'saas'],
-        addedAt: '2024.12.15 AM 10:30',
-      },
-      {
-        id: 2,
-        type: 'component',
-        title: 'Glass Navigation',
-        url: 'https://vercel.com',
-        images: [
-          { id: 'img2', src: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=400&fit=crop', note: '블러 효과 네비게이션', figmaCode: null, isComponent: false },
-        ],
-        category: 'navigation',
-        tags: ['glassmorphism', 'blur'],
-        addedAt: '2024.12.12',
-      },
-    ];
+    // 이미지 압축 함수 (용량 최적화)
+    const compressImage = (file) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 1024;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height *= MAX_SIZE / width;
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width *= MAX_SIZE / height;
+                height = MAX_SIZE;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+          img.onerror = reject;
+        };
+        reader.onerror = reject;
+      });
+    };
+
+    const DEFAULT_REFERENCES = [];
 
     function App() {
       const [references, setReferences] = useState(() => {
         const saved = localStorage.getItem('reflex-references-v2');
         if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            // 구 데이터 마이그레이션
-            return parsed.map(ref => {
-              if (ref.thumbnail && !ref.images) {
-                return {
-                  ...ref,
-                  images: [{ id: 'migrated', src: ref.thumbnail, note: ref.note || '', figmaCode: ref.figmaCode || null }],
-                };
-              }
-              return ref;
-            });
-          } catch { return DEFAULT_REFERENCES; }
+          try { return JSON.parse(saved); } catch { return DEFAULT_REFERENCES; }
         }
         return DEFAULT_REFERENCES;
       });
@@ -97,32 +104,15 @@
       const [isEditModalOpen, setIsEditModalOpen] = useState(false);
       const [editRef, setEditRef] = useState(null);
       const [imageZoom, setImageZoom] = useState(null);
-      const [isGenerating, setIsGenerating] = useState(null); // 이미지 ID
+      const [isGenerating, setIsGenerating] = useState(null);
       const [tagInput, setTagInput] = useState('');
       const [showTagSuggestions, setShowTagSuggestions] = useState(false);
       const [categoryInput, setCategoryInput] = useState('');
       const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
       const tagInputRef = useRef(null);
       const categoryInputRef = useRef(null);
-      
-      // 드롭다운 닫기 - blur 이벤트 사용 (모달과 충돌 방지)
-      const handleTagInputBlur = (e) => {
-        // 드롭다운 내부 클릭 시에는 닫지 않음
-        setTimeout(() => {
-          if (!tagInputRef.current?.contains(document.activeElement)) {
-            setShowTagSuggestions(false);
-          }
-        }, 150);
-      };
-      
-      const handleCategoryInputBlur = (e) => {
-        setTimeout(() => {
-          if (!categoryInputRef.current?.contains(document.activeElement)) {
-            setShowCategorySuggestions(false);
-          }
-        }, 150);
-      };
-      
+      const [copySuccess, setCopySuccess] = useState(false);
+
       const [newRef, setNewRef] = useState({
         type: 'web',
         title: '',
@@ -133,44 +123,47 @@
         color: '',
       });
 
-      // 컬러 옵션
       const COLOR_OPTIONS = [
-        { id: 'red', color: '#ef4444' },
-        { id: 'orange', color: '#f97316' },
-        { id: 'yellow', color: '#eab308' },
-        { id: 'green', color: '#22c55e' },
-        { id: 'blue', color: '#3b82f6' },
-        { id: 'purple', color: '#8b5cf6' },
-        { id: 'pink', color: '#ec4899' },
-        { id: 'gray', color: '#6b7280' },
-        { id: 'black', color: '#1f2937' },
-        { id: 'white', color: '#f9fafb' },
+        { id: 'red', color: '#ef4444' }, { id: 'orange', color: '#f97316' },
+        { id: 'yellow', color: '#eab308' }, { id: 'green', color: '#22c55e' },
+        { id: 'blue', color: '#3b82f6' }, { id: 'purple', color: '#8b5cf6' },
+        { id: 'pink', color: '#ec4899' }, { id: 'gray', color: '#6b7280' },
+        { id: 'black', color: '#1f2937' }, { id: 'white', color: '#f9fafb' },
       ];
 
-      // Save to localStorage
+      const handleTagInputBlur = (e) => {
+        setTimeout(() => { if (!tagInputRef.current?.contains(document.activeElement)) setShowTagSuggestions(false); }, 150);
+      };
+      
+      const handleCategoryInputBlur = (e) => {
+        setTimeout(() => { if (!categoryInputRef.current?.contains(document.activeElement)) setShowCategorySuggestions(false); }, 150);
+      };
+
       useEffect(() => {
-        localStorage.setItem('reflex-references-v2', JSON.stringify(references));
+        try {
+          localStorage.setItem('reflex-references-v2', JSON.stringify(references));
+        } catch (e) {
+          if (e.name === 'QuotaExceededError') {
+            alert('저장 공간이 부족합니다. 이미지를 삭제하거나 더 작게 줄여주세요.');
+          }
+        }
       }, [references]);
 
-      // 전체 태그 목록
       const allTags = useMemo(() => {
         const tags = new Set();
         references.forEach(ref => ref.tags?.forEach(tag => tags.add(tag)));
         return Array.from(tags).sort();
       }, [references]);
 
-      // 커스텀 카테고리 (localStorage에서 로드)
       const [customCategories, setCustomCategories] = useState(() => {
         const saved = localStorage.getItem('reflex-custom-categories');
         return saved ? JSON.parse(saved) : { web: [], mobile: [], graphic: [], component: [] };
       });
 
-      // 커스텀 카테고리 저장
       useEffect(() => {
         localStorage.setItem('reflex-custom-categories', JSON.stringify(customCategories));
       }, [customCategories]);
 
-      // 전체 카테고리 (기본 + 커스텀)
       const allCategories = useMemo(() => {
         const result = {};
         Object.keys(DEFAULT_CATEGORIES).forEach(type => {
@@ -179,7 +172,6 @@
         return result;
       }, [customCategories]);
 
-      // 필터링 (검색에 note 포함)
       const filteredReferences = useMemo(() => {
         return references.filter(ref => {
           if (activeType !== 'all' && ref.type !== activeType) return false;
@@ -196,32 +188,35 @@
         });
       }, [references, activeType, activeCategory, searchQuery, selectedTags]);
 
-      // 이미지 업로드 핸들러
-      const handleImageUpload = (e, isEdit = false) => {
+      // 이미지 업로드 (압축 적용)
+      const handleImageUpload = async (e, isEdit = false) => {
         const files = Array.from(e.target.files || []);
-        files.forEach(file => {
+        
+        for (const file of files) {
           if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
+            try {
+              const compressedSrc = await compressImage(file);
               const newImage = {
                 id: Date.now() + Math.random().toString(36).substr(2, 9),
-                src: ev.target.result,
+                src: compressedSrc,
                 note: '',
                 figmaCode: null,
                 isComponent: false,
               };
+
               if (isEdit && editRef) {
                 setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
               } else {
                 setNewRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
               }
-            };
-            reader.readAsDataURL(file);
+            } catch (err) {
+              console.error('Image compression failed', err);
+              alert('이미지 처리 중 오류가 발생했습니다.');
+            }
           }
-        });
+        }
       };
 
-      // 이미지 삭제
       const handleRemoveImage = (imgId, isEdit = false) => {
         if (isEdit) {
           setEditRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
@@ -230,114 +225,67 @@
         }
       };
 
-      // 이미지 노트 수정
       const handleImageNoteChange = (imgId, note, isEdit = false) => {
         if (isEdit) {
-          setEditRef(prev => ({
-            ...prev,
-            images: prev.images.map(img => img.id === imgId ? { ...img, note } : img)
-          }));
+          setEditRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, note } : img) }));
         } else {
-          setNewRef(prev => ({
-            ...prev,
-            images: prev.images.map(img => img.id === imgId ? { ...img, note } : img)
-          }));
+          setNewRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, note } : img) }));
         }
       };
 
-      // 태그 추가
       const handleAddTag = (tag, isEdit = false) => {
         const trimmed = tag.trim().toLowerCase();
         if (!trimmed) return;
         if (isEdit) {
-          if (!editRef.tags.includes(trimmed)) {
-            setEditRef(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
-          }
+          if (!editRef.tags.includes(trimmed)) setEditRef(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
         } else {
-          if (!newRef.tags.includes(trimmed)) {
-            setNewRef(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
-          }
+          if (!newRef.tags.includes(trimmed)) setNewRef(prev => ({ ...prev, tags: [...prev.tags, trimmed] }));
         }
         setTagInput('');
         setShowTagSuggestions(false);
       };
 
-      // 태그 제거
       const handleRemoveTag = (tag, isEdit = false) => {
-        if (isEdit) {
-          setEditRef(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
-        } else {
-          setNewRef(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
-        }
+        if (isEdit) setEditRef(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
+        else setNewRef(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
       };
 
-      // 태그 제안 필터
       const filteredTagSuggestions = useMemo(() => {
         if (!tagInput) return allTags.slice(0, 10);
         return allTags.filter(t => t.includes(tagInput.toLowerCase())).slice(0, 10);
       }, [tagInput, allTags]);
 
-      // 카테고리 추가
       const handleAddCategory = (type, category) => {
         const trimmed = category.trim();
         if (!trimmed) return;
         if (!allCategories[type]?.includes(trimmed)) {
-          setCustomCategories(prev => ({
-            ...prev,
-            [type]: [...(prev[type] || []), trimmed]
-          }));
+          setCustomCategories(prev => ({ ...prev, [type]: [...(prev[type] || []), trimmed] }));
         }
         setCategoryInput('');
         setShowCategorySuggestions(false);
       };
 
-      // 날짜 포맷 함수
       const formatDateTime = () => {
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = now.getHours();
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const hour12 = String(hours % 12 || 12).padStart(2, '0');
-        return `${year}.${month}.${day} ${ampm} ${hour12}:${minutes}`;
+        return `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${now.getHours()>=12?'PM':'AM'} ${String(now.getHours()%12||12).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
       };
 
-      // 이미지 컴포넌트 체크 토글
       const handleToggleComponent = (imgId, isEdit = false) => {
         if (isEdit) {
-          setEditRef(prev => ({
-            ...prev,
-            images: prev.images.map(img => 
-              img.id === imgId ? { ...img, isComponent: !img.isComponent } : img
-            )
-          }));
+          setEditRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, isComponent: !img.isComponent } : img) }));
         } else {
-          setNewRef(prev => ({
-            ...prev,
-            images: prev.images.map(img => 
-              img.id === imgId ? { ...img, isComponent: !img.isComponent } : img
-            )
-          }));
+          setNewRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, isComponent: !img.isComponent } : img) }));
         }
       };
 
-      // 레퍼런스 추가 (컴포넌트 자동 생성 포함)
       const handleAddReference = () => {
         if (!newRef.title || newRef.images.length === 0) {
           alert('제목과 최소 1개의 이미지가 필요합니다.');
           return;
         }
-        
         const addedAt = formatDateTime();
-        const reference = {
-          id: Date.now(),
-          ...newRef,
-          addedAt,
-        };
+        const reference = { id: Date.now(), ...newRef, addedAt };
         
-        // 컴포넌트로 체크된 이미지들 자동 추가
         const componentImages = newRef.images.filter(img => img.isComponent);
         const componentRefs = componentImages.map((img, idx) => ({
           id: Date.now() + idx + 1,
@@ -345,10 +293,10 @@
           title: `${newRef.title} - Component`,
           url: newRef.url,
           images: [{ ...img, isComponent: false }],
-          category: 'card',
+          category: 'Card',
           tags: [...newRef.tags],
           addedAt,
-          sourceRefId: reference.id, // 원본 참조
+          sourceRefId: reference.id,
         }));
         
         setReferences(prev => [reference, ...componentRefs, ...prev]);
@@ -356,7 +304,6 @@
         setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [] });
       };
 
-      // 레퍼런스 수정 저장
       const handleSaveEdit = () => {
         if (!editRef.title) return;
         setReferences(prev => prev.map(ref => ref.id === editRef.id ? editRef : ref));
@@ -364,13 +311,13 @@
         setIsEditModalOpen(false);
       };
 
-      // 레퍼런스 삭제
       const handleDeleteReference = (id) => {
+        if(!confirm('정말 삭제하시겠습니까?')) return;
         setReferences(prev => prev.filter(ref => ref.id !== id));
         setSelectedRef(null);
       };
 
-      // Figma 코드 생성 (특정 이미지)
+      // Figma 생성 API 호출 (노트 및 태그 포함)
       const handleGenerateFigma = async (refId, imgId) => {
         const ref = references.find(r => r.id === refId);
         const img = ref?.images.find(i => i.id === imgId);
@@ -386,19 +333,8 @@
             const [header, data] = img.src.split(',');
             mimeType = header.match(/data:(.*?);/)?.[1] || 'image/png';
             base64Data = data;
-          } else {
-            // URL인 경우 fetch
-            const response = await fetch(img.src);
-            const blob = await response.blob();
-            mimeType = blob.type;
-            base64Data = await new Promise(resolve => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result.split(',')[1]);
-              reader.readAsDataURL(blob);
-            });
           }
 
-          // 이미지 크기
           const imgEl = new Image();
           imgEl.src = img.src;
           await new Promise(resolve => { imgEl.onload = resolve; });
@@ -412,6 +348,8 @@
               componentName: ref.title,
               imageWidth: imgEl.naturalWidth,
               imageHeight: imgEl.naturalHeight,
+              context: img.note || ref.title, 
+              tags: ref.tags || []
             }),
           });
 
@@ -427,7 +365,6 @@
                 images: r.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
               };
             }));
-            // 현재 선택된 ref 업데이트
             if (selectedRef?.id === refId) {
               setSelectedRef(prev => ({
                 ...prev,
@@ -437,25 +374,20 @@
           }
         } catch (error) {
           console.error('Figma 생성 실패:', error);
-          alert('Figma 코드 생성에 실패했습니다.');
+          alert('Figma 코드 생성에 실패했습니다. API 키나 네트워크를 확인해주세요.');
         } finally {
           setIsGenerating(null);
         }
       };
 
-      // 클립보드 복사 (피드백 포함)
-      const [copySuccess, setCopySuccess] = useState(false);
       const copyToClipboard = (code) => {
         navigator.clipboard.writeText(code);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
       };
 
-      // 태그 토글 (다중 선택)
       const toggleTag = (tag) => {
-        setSelectedTags(prev => 
-          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-        );
+        setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
       };
 
       return (
@@ -488,7 +420,7 @@
             </div>
             <input
               type="text"
-              placeholder="Search title, tags, description..."
+              placeholder="Search title, tags..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={styles.searchInput}
@@ -555,7 +487,7 @@
                     <span style={styles.imageCount}>+{ref.images.length - 1}</span>
                   )}
                   {ref.images.some(img => img.figmaCode) && (
-                    <span style={styles.figmaBadge}>◫</span>
+                    <span style={styles.figmaBadge}>◫ AI</span>
                   )}
                 </div>
                 <div style={styles.cardContent}>
@@ -576,7 +508,6 @@
               <div style={styles.modal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
                 
-                {/* 이미지 갤러리 */}
                 <div style={styles.imageGallery}>
                   <img
                     src={selectedRef.images[selectedImageIndex]?.src}
@@ -610,34 +541,34 @@
                     <a href={selectedRef.url} target="_blank" style={styles.modalUrl}>{selectedRef.url} ↗</a>
                   )}
                   
-                  {/* 현재 이미지 노트 */}
                   {selectedRef.images[selectedImageIndex]?.note && (
                     <p style={styles.modalNote}>{selectedRef.images[selectedImageIndex].note}</p>
                   )}
 
-                  {/* 태그 */}
                   <div style={styles.modalTags}>
                     {selectedRef.tags?.map(tag => (
                       <span key={tag} style={styles.modalTag}>{tag}</span>
                     ))}
                   </div>
 
-                  {/* Figma 코드 생성/표시 */}
                   <div style={styles.figmaSection}>
                     {selectedRef.images[selectedImageIndex]?.figmaCode ? (
                       <>
                         <div style={styles.figmaHeader}>
-                          <span>◫ Figma Code</span>
+                          <span>◫ Figma Plugin Code</span>
                           <button
                             style={{ ...styles.copyBtn, ...(copySuccess ? styles.copyBtnSuccess : {}) }}
                             onClick={() => copyToClipboard(selectedRef.images[selectedImageIndex].figmaCode)}
                           >
-                            {copySuccess ? '✓ Copied!' : 'Copy'}
+                            {copySuccess ? '✓ Copied!' : 'Copy Code'}
                           </button>
                         </div>
-                        <pre style={styles.figmaCode}>
-                          {selectedRef.images[selectedImageIndex].figmaCode.slice(0, 300)}...
-                        </pre>
+                        <div style={styles.codeWrapper}>
+                          <pre style={styles.figmaCode}>
+                            {selectedRef.images[selectedImageIndex].figmaCode}
+                          </pre>
+                        </div>
+                        <p style={{fontSize: '12px', color: '#888', marginTop: '8px'}}>* Figma에서 Plugins &gt; Development &gt; New Plugin을 열고 위 코드를 붙여넣으세요.</p>
                       </>
                     ) : (
                       <button
@@ -646,9 +577,9 @@
                         disabled={isGenerating}
                       >
                         {isGenerating === selectedRef.images[selectedImageIndex]?.id ? (
-                          <><span style={styles.spinner}></span> Generating...</>
+                          <><span style={styles.spinner}></span> Analyzing Design...</>
                         ) : (
-                          '◫ Generate Figma Code'
+                          '◫ Generate Figma Component Code (AI)'
                         )}
                       </button>
                     )}
@@ -677,7 +608,6 @@
                 <button style={styles.modalClose} onClick={() => setIsAddModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Add New Reference</h2>
 
-                {/* Type */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Type</label>
                   <div style={styles.typeToggle}>
@@ -708,7 +638,6 @@
                   </div>
                 </div>
 
-                {/* Images */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
                     Images {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') ? '(여러 장 가능)' : '(1장)'}
@@ -751,7 +680,6 @@
                   </div>
                 </div>
 
-                {/* Title */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Title *</label>
                   <input
@@ -763,7 +691,6 @@
                   />
                 </div>
 
-                {/* URL */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>URL</label>
                   <input
@@ -775,7 +702,6 @@
                   />
                 </div>
 
-                {/* Category */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Category</label>
                   <div style={styles.categoryInputWrapper} ref={categoryInputRef}>
@@ -817,7 +743,6 @@
                   </div>
                 </div>
 
-                {/* Tags */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Tags</label>
                   <div style={styles.tagsContainer}>
@@ -851,7 +776,6 @@
                   </div>
                 </div>
 
-                {/* Color */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Color</label>
                   <div style={styles.colorPicker}>
@@ -883,7 +807,6 @@
                 <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Edit Reference</h2>
 
-                {/* Type */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Type</label>
                   <div style={styles.typeToggle}>
@@ -914,7 +837,6 @@
                   </div>
                 </div>
 
-                {/* Images */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Images</label>
                   <div style={styles.imageUploadArea}>
@@ -955,7 +877,6 @@
                   </div>
                 </div>
 
-                {/* Title */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Title *</label>
                   <input
@@ -966,7 +887,6 @@
                   />
                 </div>
 
-                {/* URL */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>URL</label>
                   <input
@@ -977,7 +897,6 @@
                   />
                 </div>
 
-                {/* Category */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Category</label>
                   <div style={styles.categoryInputWrapper}>
@@ -1007,7 +926,6 @@
                   </div>
                 </div>
 
-                {/* Tags */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Tags</label>
                   <div style={styles.tagsContainer}>
@@ -1041,7 +959,6 @@
                   </div>
                 </div>
 
-                {/* Color */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Color</label>
                   <div style={styles.colorPicker}>
@@ -1066,8 +983,7 @@
               </div>
             </div>
           )}
-
-          {/* Image Zoom */}
+          
           {imageZoom && (
             <div style={styles.zoomOverlay} onClick={() => setImageZoom(null)}>
               <img src={imageZoom} alt="" style={styles.zoomImage} />
@@ -1090,9 +1006,16 @@
       typeButton: { padding: '8px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif', fontSize: '14px' },
       typeButtonActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
       searchInput: { padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', width: '200px', fontFamily: '"Outfit", sans-serif' },
-      categoryFilter: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' },
-      catButton: { padding: '6px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
-      catButtonActive: { background: '#f0f0ff', borderColor: '#6366f1', color: '#6366f1' },
+      categoryFilterSection: { maxWidth: '1400px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+      filterLabel: { fontSize: '13px', color: '#888', fontWeight: '600', minWidth: '70px' },
+      categoryFilter: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      catButton: { padding: '6px 14px', background: '#f5f5f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', color: '#555', transition: 'all 0.2s' },
+      catButtonActive: { background: '#6366f1', color: '#fff' },
+      tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+      tagFilterList: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
+      tagFilterBtn: { padding: '5px 12px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#7c3aed', transition: 'all 0.2s' },
+      tagFilterBtnActive: { background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' },
+      clearTagsBtn: { padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif' },
       grid: { maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
       card: { background: '#fff', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', transition: 'transform 0.2s, box-shadow 0.2s' },
       cardImageWrapper: { position: 'relative', aspectRatio: '16/10', overflow: 'hidden' },
@@ -1124,7 +1047,8 @@
       figmaHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
       copyBtn: { padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', transition: 'all 0.2s' },
       copyBtnSuccess: { background: '#22c55e' },
-      figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace', overflow: 'auto', maxHeight: '150px' },
+      codeWrapper: { position: 'relative', maxHeight: '300px', overflow: 'hidden', borderRadius: '8px' },
+      figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace', overflow: 'auto', maxHeight: '300px', whiteSpace: 'pre-wrap' },
       generateBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' },
       generateBtnDisabled: { background: '#a5a6f6', cursor: 'not-allowed' },
       spinner: { width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
@@ -1135,7 +1059,6 @@
       formGroup: { marginBottom: '20px' },
       label: { display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#333' },
       input: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
-      select: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
       imageUploadArea: { display: 'flex', flexWrap: 'wrap', gap: '16px' },
       uploadedImage: { position: 'relative', width: '180px' },
       uploadedThumb: { width: '180px', height: '120px', objectFit: 'cover', borderRadius: '8px' },
@@ -1159,16 +1082,6 @@
       submitBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', fontFamily: '"Outfit", sans-serif' },
       editBtns: { display: 'flex', gap: '12px' },
       cancelBtn: { flex: 1, padding: '14px', background: '#f0f0f5', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
-      categoryFilterSection: { maxWidth: '1400px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
-      filterLabel: { fontSize: '13px', color: '#888', fontWeight: '600', minWidth: '70px' },
-      categoryFilter: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-      catButton: { padding: '6px 14px', background: '#f5f5f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', color: '#555', transition: 'all 0.2s' },
-      catButtonActive: { background: '#6366f1', color: '#fff' },
-      tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
-      tagFilterList: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
-      tagFilterBtn: { padding: '5px 12px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#7c3aed', transition: 'all 0.2s' },
-      tagFilterBtnActive: { background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' },
-      clearTagsBtn: { padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif' },
       zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
       zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
     };
