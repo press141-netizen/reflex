@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, componentName, mimeType, imageWidth, imageHeight } = req.body;
+    const { image, componentName, mimeType, imageWidth, imageHeight, imageNote, imageTags } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image is required' });
@@ -31,6 +31,15 @@ export default async function handler(req, res) {
     const width = imageWidth || 400;
     const height = imageHeight || 300;
     const mime = mimeType || 'image/png';
+    
+    // AI에 추가 컨텍스트 전달
+    let contextInfo = '';
+    if (imageNote && imageNote.trim()) {
+      contextInfo += `\n설명: ${imageNote}`;
+    }
+    if (imageTags && imageTags.length > 0) {
+      contextInfo += `\n태그: ${imageTags.join(', ')}`;
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -46,7 +55,7 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).
+            { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).${contextInfo}
 
 RULES:
 - Return ONLY JavaScript code, no markdown
