@@ -153,7 +153,10 @@
       const [selectedTags, setSelectedTags] = useState([]);
       const [selectedRef, setSelectedRef] = useState(null);
       const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+      const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+      const [editRef, setEditRef] = useState(null);
       const [imageZoom, setImageZoom] = useState(null);
+      const [isGeneratingForExisting, setIsGeneratingForExisting] = useState(false);
       const [newRef, setNewRef] = useState({
         type: 'website',
         title: '',
@@ -480,6 +483,91 @@ const copyToClipboard = async (text) => {
         setSelectedRef(null);
       };
 
+      // 수정 모달 열기
+      const openEditModal = (ref) => {
+        setEditRef({
+          ...ref,
+          tags: ref.tags.join(', '),
+        });
+        setIsEditModalOpen(true);
+      };
+
+      // 수정 저장
+      const handleSaveEdit = () => {
+        if (!editRef.title) return;
+        
+        const updatedRef = {
+          ...editRef,
+          tags: editRef.tags.split(',').map(t => t.trim()).filter(t => t),
+        };
+        
+        setReferences(prev => prev.map(ref => 
+          ref.id === updatedRef.id ? updatedRef : ref
+        ));
+        setSelectedRef(updatedRef);
+        setIsEditModalOpen(false);
+        setEditRef(null);
+      };
+
+      // 기존 이미지에 AI 분석 실행
+      const handleGenerateForExisting = async (ref) => {
+        if (!ref.thumbnail || isGeneratingForExisting) return;
+        
+        setIsGeneratingForExisting(true);
+        
+        try {
+          // 이미지 URL을 base64로 변환
+          const response = await fetch(ref.thumbnail);
+          const blob = await response.blob();
+          
+          const base64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          
+          const base64Data = base64.split(",")[1] || "";
+          const mimeType = blob.type || 'image/png';
+          
+          // 이미지 크기 가져오기
+          const img = new Image();
+          img.src = ref.thumbnail;
+          await new Promise(resolve => { img.onload = resolve; });
+          
+          const apiResponse = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64Data,
+              mimeType,
+              componentName: ref.title || 'GeneratedComponent',
+              imageWidth: img.naturalWidth,
+              imageHeight: img.naturalHeight
+            })
+          });
+          
+          if (!apiResponse.ok) {
+            throw new Error('API failed');
+          }
+          
+          const result = await apiResponse.json();
+          
+          if (result.figmaCode) {
+            // 해당 레퍼런스 업데이트
+            const updatedRef = { ...ref, figmaCode: result.figmaCode };
+            setReferences(prev => prev.map(r => 
+              r.id === ref.id ? updatedRef : r
+            ));
+            setSelectedRef(updatedRef);
+          }
+        } catch (error) {
+          console.error('AI 분석 실패:', error);
+          alert('AI 분석에 실패했습니다. 다시 시도해주세요.');
+        } finally {
+          setIsGeneratingForExisting(false);
+        }
+      };
+
       return (
         <div style={styles.container}>
           <div style={styles.bgGradient1} />
@@ -666,6 +754,27 @@ const copyToClipboard = async (text) => {
                     ))}
                   </div>
                   
+                  {/* AI 분석 버튼 (Figma 코드 없을 때) */}
+                  {!selectedRef.figmaCode && selectedRef.thumbnail && (
+                    <button
+                      style={{
+                        ...styles.generateAIButton,
+                        ...(isGeneratingForExisting ? styles.generateAIButtonDisabled : {}),
+                      }}
+                      onClick={() => handleGenerateForExisting(selectedRef)}
+                      disabled={isGeneratingForExisting}
+                    >
+                      {isGeneratingForExisting ? (
+                        <>
+                          <span style={styles.btnSpinner}></span>
+                          Generating Figma Code...
+                        </>
+                      ) : (
+                        <>◫ Generate Figma Code</>
+                      )}
+                    </button>
+                  )}
+                  
                   {selectedRef.figmaCode && (
                     <div style={styles.detailFigmaSection}>
                       <div style={styles.detailFigmaHeader}>
@@ -680,9 +789,14 @@ const copyToClipboard = async (text) => {
                   
                   <div style={styles.modalFooter}>
                     <span style={styles.modalDate}>Added {selectedRef.addedAt}</span>
-                    <button style={styles.deleteButton} onClick={() => handleDeleteReference(selectedRef.id)}>
-                      Delete
-                    </button>
+                    <div style={styles.modalActions}>
+                      <button style={styles.editButton} onClick={() => openEditModal(selectedRef)}>
+                        ✎ Edit
+                      </button>
+                      <button style={styles.deleteButton} onClick={() => handleDeleteReference(selectedRef.id)}>
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -917,6 +1031,106 @@ const copyToClipboard = async (text) => {
             <div style={styles.zoomOverlay} onClick={() => setImageZoom(null)}>
               <button style={styles.zoomClose} onClick={() => setImageZoom(null)}>✕</button>
               <img src={imageZoom} alt="Zoomed" style={styles.zoomImage} />
+            </div>
+          )}
+
+          {/* Edit Modal */}
+          {isEditModalOpen && editRef && (
+            <div style={styles.modalOverlay} onClick={() => setIsEditModalOpen(false)}>
+              <div style={styles.editModal} onClick={e => e.stopPropagation()}>
+                <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
+                <h2 style={styles.addModalTitle}>Edit Reference</h2>
+                
+                <div style={styles.editModalForm}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Type</label>
+                    <div style={styles.typeSelector}>
+                      <button
+                        type="button"
+                        onClick={() => setEditRef({...editRef, type: 'website', category: 'landing'})}
+                        style={{
+                          ...styles.typeSelectorButton,
+                          ...(editRef.type === 'website' ? styles.typeSelectorButtonActive : {}),
+                        }}
+                      >
+                        ◎ Website
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditRef({...editRef, type: 'component', category: 'navigation'})}
+                        style={{
+                          ...styles.typeSelectorButton,
+                          ...(editRef.type === 'component' ? styles.typeSelectorButtonActive : {}),
+                        }}
+                      >
+                        ◫ Component
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Title *</label>
+                    <input
+                      type="text"
+                      value={editRef.title}
+                      onChange={e => setEditRef({...editRef, title: e.target.value})}
+                      style={styles.formInput}
+                    />
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>URL</label>
+                    <input
+                      type="url"
+                      value={editRef.url || ''}
+                      onChange={e => setEditRef({...editRef, url: e.target.value})}
+                      style={styles.formInput}
+                    />
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Category</label>
+                    <select
+                      value={editRef.category}
+                      onChange={e => setEditRef({...editRef, category: e.target.value})}
+                      style={styles.formSelect}
+                    >
+                      {CATEGORIES[editRef.type]?.filter(c => c.id !== 'all').map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Tags</label>
+                    <input
+                      type="text"
+                      value={editRef.tags}
+                      onChange={e => setEditRef({...editRef, tags: e.target.value})}
+                      placeholder="minimal, dark, animation (comma separated)"
+                      style={styles.formInput}
+                    />
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Note</label>
+                    <textarea
+                      value={editRef.note || ''}
+                      onChange={e => setEditRef({...editRef, note: e.target.value})}
+                      style={styles.formTextarea}
+                    />
+                  </div>
+
+                  <div style={styles.editModalButtons}>
+                    <button style={styles.cancelButton} onClick={() => setIsEditModalOpen(false)}>
+                      Cancel
+                    </button>
+                    <button style={styles.saveButton} onClick={handleSaveEdit}>
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1853,6 +2067,87 @@ const copyToClipboard = async (text) => {
         color: '#fff',
         fontSize: '20px',
         cursor: 'pointer',
+      },
+      modalActions: {
+        display: 'flex',
+        gap: '8px',
+      },
+      editButton: {
+        padding: '8px 16px',
+        background: '#f0f0f5',
+        border: 'none',
+        borderRadius: '8px',
+        color: '#555',
+        fontSize: '13px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        fontFamily: '"Outfit", sans-serif',
+      },
+      generateAIButton: {
+        width: '100%',
+        padding: '14px 20px',
+        marginTop: '16px',
+        marginBottom: '16px',
+        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '12px',
+        fontSize: '15px',
+        fontWeight: '600',
+        fontFamily: '"Outfit", sans-serif',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+      },
+      generateAIButtonDisabled: {
+        background: '#a5a6f6',
+        cursor: 'not-allowed',
+      },
+      editModal: {
+        background: '#fff',
+        borderRadius: '20px',
+        maxWidth: '500px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative',
+        padding: '30px',
+      },
+      editModalForm: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+      },
+      editModalButtons: {
+        display: 'flex',
+        gap: '12px',
+        marginTop: '8px',
+      },
+      cancelButton: {
+        flex: 1,
+        padding: '12px 20px',
+        background: '#f0f0f5',
+        border: 'none',
+        borderRadius: '10px',
+        color: '#555',
+        fontSize: '14px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        fontFamily: '"Outfit", sans-serif',
+      },
+      saveButton: {
+        flex: 1,
+        padding: '12px 20px',
+        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        border: 'none',
+        borderRadius: '10px',
+        color: '#fff',
+        fontSize: '14px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        fontFamily: '"Outfit", sans-serif',
       },
     };
 
