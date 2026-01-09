@@ -16,14 +16,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, componentName, mimeType, imageWidth, imageHeight, imageNote, tags } = req.body;
+    const { image, componentName, mimeType, imageWidth, imageHeight, context } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image is required' });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
-
+    
     if (!apiKey) {
       return res.status(500).json({ error: 'API key not configured' });
     }
@@ -31,6 +31,19 @@ export default async function handler(req, res) {
     const width = imageWidth || 400;
     const height = imageHeight || 300;
     const mime = mimeType || 'image/png';
+
+    // 컨텍스트 정보 구성
+    let contextInfo = '';
+    if (context) {
+      const parts = [];
+      if (context.note) parts.push(`Description: "${context.note}"`);
+      if (context.tags?.length) parts.push(`Tags: ${context.tags.join(', ')}`);
+      if (context.type) parts.push(`Type: ${context.type}`);
+      if (context.category) parts.push(`Category: ${context.category}`);
+      if (parts.length) {
+        contextInfo = `\n\nCONTEXT INFORMATION (use this to understand the UI better):\n${parts.join('\n')}`;
+      }
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -46,21 +59,18 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            {
-              type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).
-${imageNote || tags?.length > 0 ? `
-CONTEXT:
-${imageNote ? `- Description: ${imageNote}` : ''}${imageNote && tags?.length > 0 ? '\n' : ''}${tags?.length > 0 ? `- Tags: ${tags.join(', ')}` : ''}
-` : ''}
+            { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).${contextInfo}
+
 RULES:
 - Return ONLY JavaScript code, no markdown
-- Use helpers: txt(), box(), container() as shown below
-- Charts/graphs = single placeholder rectangle
-- Icons = small colored rectangles
+- Use helpers: txt(), box(), row(), col() as shown below
+- Charts/graphs = single placeholder rectangle with appropriate color
+- Icons = small colored rectangles (16-24px)
 - MUST end with figma.currentPage.appendChild() and figma.viewport.scrollAndZoomIntoView()
-- All frames with fixed size need: primaryAxisSizingMode = "FIXED"; counterAxisSizingMode = "FIXED";
+- All fixed-size frames need: primaryAxisSizingMode = "FIXED"; counterAxisSizingMode = "FIXED";
+- Match the colors and layout from the image accurately
 
-START CODE:
+CODE TEMPLATE:
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
@@ -77,13 +87,13 @@ START CODE:
   frame.layoutMode = "VERTICAL";
   frame.primaryAxisSizingMode = "FIXED";
   frame.counterAxisSizingMode = "FIXED";
-  // Continue building UI...
+  // Build the UI structure here...
   
   figma.currentPage.appendChild(frame);
   figma.viewport.scrollAndZoomIntoView([frame]);
 })();
 
-Analyze the image and complete the code. Keep it concise but complete.` }
+Analyze the image carefully and generate complete, working code.` }
           ],
         }],
       }),
@@ -96,13 +106,12 @@ Analyze the image and complete the code. Keep it concise but complete.` }
 
     const data = await response.json();
     let code = data.content?.[0]?.text || '';
-
+    
     // Clean up markdown formatting
     code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
-
+    
     // Validate code completeness
     if (!code.includes('figma.currentPage.appendChild') || !code.includes('figma.viewport.scrollAndZoomIntoView')) {
-      // Try to fix incomplete code
       if (!code.includes('figma.currentPage.appendChild')) {
         code = code.replace(/\}\)\(\);?\s*$/, `
   figma.currentPage.appendChild(frame);
