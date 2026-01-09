@@ -25,12 +25,13 @@
 
     const TYPES = [
       { id: 'all', name: 'All', emoji: '✦' },
-      { id: 'website', name: 'Website', emoji: '◎' },
+      { id: 'web', name: 'Web', emoji: '◎' },
+      { id: 'mobile', name: 'Mobile', emoji: '◐' },
       { id: 'component', name: 'Component', emoji: '◫' },
     ];
 
     const CATEGORIES = {
-      website: [
+      web: [
         { id: 'all', name: 'All', emoji: '✦' },
         { id: 'landing', name: 'Landing', emoji: '◎' },
         { id: 'portfolio', name: 'Portfolio', emoji: '◐' },
@@ -38,6 +39,13 @@
         { id: 'dashboard', name: 'Dashboard', emoji: '▣' },
         { id: 'blog', name: 'Blog', emoji: '▤' },
         { id: 'corporate', name: 'Corporate', emoji: '◧' },
+      ],
+      mobile: [
+        { id: 'all', name: 'All', emoji: '✦' },
+        { id: 'ios', name: 'iOS', emoji: '◎' },
+        { id: 'android', name: 'Android', emoji: '◐' },
+        { id: 'app', name: 'App', emoji: '◈' },
+        { id: 'onboarding', name: 'Onboarding', emoji: '▣' },
       ],
       component: [
         { id: 'all', name: 'All', emoji: '✦' },
@@ -51,19 +59,19 @@
       ],
     };
 
-    // 새로운 데이터 구조: images 배열 (각 이미지별 note, figmaCode)
+    // 새로운 데이터 구조: images 배열 (각 이미지별 note, figmaCode, isComponent)
     const DEFAULT_REFERENCES = [
       {
         id: 1,
-        type: 'website',
+        type: 'web',
         title: 'Linear Homepage',
         url: 'https://linear.app',
         images: [
-          { id: 'img1', src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop', note: '메인 히어로 섹션', figmaCode: null },
+          { id: 'img1', src: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop', note: '메인 히어로 섹션', figmaCode: null, isComponent: false },
         ],
         category: 'landing',
         tags: ['minimal', 'dark', 'saas'],
-        addedAt: '2024.12.15',
+        addedAt: '2024.12.15 AM 10:30',
       },
       {
         id: 2,
@@ -71,7 +79,7 @@
         title: 'Glass Navigation',
         url: 'https://vercel.com',
         images: [
-          { id: 'img2', src: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=400&fit=crop', note: '블러 효과 네비게이션', figmaCode: null },
+          { id: 'img2', src: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=400&fit=crop', note: '블러 효과 네비게이션', figmaCode: null, isComponent: false },
         ],
         category: 'navigation',
         tags: ['glassmorphism', 'blur'],
@@ -115,7 +123,7 @@
       const [showTagSuggestions, setShowTagSuggestions] = useState(false);
       
       const [newRef, setNewRef] = useState({
-        type: 'website',
+        type: 'web',
         title: '',
         url: '',
         images: [], // { id, src, note, figmaCode }
@@ -161,6 +169,7 @@
                 src: ev.target.result,
                 note: '',
                 figmaCode: null,
+                isComponent: false,
               };
               if (isEdit && editRef) {
                 setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
@@ -229,22 +238,69 @@
         return allTags.filter(t => t.includes(tagInput.toLowerCase())).slice(0, 10);
       }, [tagInput, allTags]);
 
-      // 레퍼런스 추가
+      // 날짜 포맷 함수
+      const formatDateTime = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = now.getHours();
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const hour12 = String(hours % 12 || 12).padStart(2, '0');
+        return `${year}.${month}.${day} ${ampm} ${hour12}:${minutes}`;
+      };
+
+      // 이미지 컴포넌트 체크 토글
+      const handleToggleComponent = (imgId, isEdit = false) => {
+        if (isEdit) {
+          setEditRef(prev => ({
+            ...prev,
+            images: prev.images.map(img => 
+              img.id === imgId ? { ...img, isComponent: !img.isComponent } : img
+            )
+          }));
+        } else {
+          setNewRef(prev => ({
+            ...prev,
+            images: prev.images.map(img => 
+              img.id === imgId ? { ...img, isComponent: !img.isComponent } : img
+            )
+          }));
+        }
+      };
+
+      // 레퍼런스 추가 (컴포넌트 자동 생성 포함)
       const handleAddReference = () => {
         if (!newRef.title || newRef.images.length === 0) {
           alert('제목과 최소 1개의 이미지가 필요합니다.');
           return;
         }
         
+        const addedAt = formatDateTime();
         const reference = {
           id: Date.now(),
           ...newRef,
-          addedAt: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace('.', ''),
+          addedAt,
         };
         
-        setReferences(prev => [reference, ...prev]);
+        // 컴포넌트로 체크된 이미지들 자동 추가
+        const componentImages = newRef.images.filter(img => img.isComponent);
+        const componentRefs = componentImages.map((img, idx) => ({
+          id: Date.now() + idx + 1,
+          type: 'component',
+          title: `${newRef.title} - Component`,
+          url: newRef.url,
+          images: [{ ...img, isComponent: false }],
+          category: 'card',
+          tags: [...newRef.tags],
+          addedAt,
+          sourceRefId: reference.id, // 원본 참조
+        }));
+        
+        setReferences(prev => [reference, ...componentRefs, ...prev]);
         setIsAddModalOpen(false);
-        setNewRef({ type: 'website', title: '', url: '', images: [], category: 'landing', tags: [] });
+        setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [] });
       };
 
       // 레퍼런스 수정 저장
@@ -415,7 +471,7 @@
                       ...(selectedTags.includes(tag) ? styles.tagFilterBtnActive : {}) 
                     }}
                   >
-                    #{tag}
+                    {tag}
                   </button>
                 ))}
                 {selectedTags.length > 0 && (
@@ -444,7 +500,7 @@
                   <h3 style={styles.cardTitle}>{ref.title}</h3>
                   <div style={styles.cardTags}>
                     {ref.tags?.slice(0, 3).map(tag => (
-                      <span key={tag} style={styles.cardTag}>#{tag}</span>
+                      <span key={tag} style={styles.cardTag}>{tag}</span>
                     ))}
                   </div>
                 </div>
@@ -500,7 +556,7 @@
                   {/* 태그 */}
                   <div style={styles.modalTags}>
                     {selectedRef.tags?.map(tag => (
-                      <span key={tag} style={styles.modalTag}>#{tag}</span>
+                      <span key={tag} style={styles.modalTag}>{tag}</span>
                     ))}
                   </div>
 
@@ -564,10 +620,16 @@
                   <label style={styles.label}>Type</label>
                   <div style={styles.typeToggle}>
                     <button
-                      style={{ ...styles.typeButton, ...(newRef.type === 'website' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setNewRef(p => ({ ...p, type: 'website', category: 'landing' }))}
+                      style={{ ...styles.typeButton, ...(newRef.type === 'web' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'web', category: 'landing' }))}
                     >
-                      ◎ Website
+                      ◎ Web
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'mobile', category: 'ios' }))}
+                    >
+                      ◐ Mobile
                     </button>
                     <button
                       style={{ ...styles.typeButton, ...(newRef.type === 'component' ? styles.typeButtonActive : {}) }}
@@ -581,7 +643,7 @@
                 {/* Images */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
-                    Images {newRef.type === 'website' ? '(여러 장 가능)' : '(1장)'}
+                    Images {(newRef.type === 'web' || newRef.type === 'mobile') ? '(여러 장 가능)' : '(1장)'}
                   </label>
                   <div style={styles.imageUploadArea}>
                     {newRef.images.map(img => (
@@ -594,15 +656,25 @@
                           onChange={e => handleImageNoteChange(img.id, e.target.value)}
                           style={styles.imgNoteInput}
                         />
+                        {(newRef.type === 'web' || newRef.type === 'mobile') && (
+                          <label style={styles.componentCheckbox}>
+                            <input
+                              type="checkbox"
+                              checked={img.isComponent || false}
+                              onChange={() => handleToggleComponent(img.id)}
+                            />
+                            <span>Component로 추가</span>
+                          </label>
+                        )}
                       </div>
                     ))}
-                    {(newRef.type === 'website' || newRef.images.length === 0) && (
+                    {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.images.length === 0) && (
                       <label style={styles.addImageBtn}>
                         + Add Image
                         <input
                           type="file"
                           accept="image/*"
-                          multiple={newRef.type === 'website'}
+                          multiple={newRef.type === 'web' || newRef.type === 'mobile'}
                           onChange={e => handleImageUpload(e)}
                           style={{ display: 'none' }}
                         />
@@ -655,7 +727,7 @@
                   <div style={styles.tagsContainer}>
                     {newRef.tags.map(tag => (
                       <span key={tag} style={styles.tagChip}>
-                        #{tag}
+                        {tag}
                         <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag)}>×</button>
                       </span>
                     ))}
@@ -674,7 +746,7 @@
                       <div style={styles.tagSuggestions}>
                         {filteredTagSuggestions.map(tag => (
                           <button key={tag} style={styles.tagSuggestion} onClick={() => handleAddTag(tag)}>
-                            #{tag}
+                            {tag}
                           </button>
                         ))}
                       </div>
@@ -701,10 +773,16 @@
                   <label style={styles.label}>Type</label>
                   <div style={styles.typeToggle}>
                     <button
-                      style={{ ...styles.typeButton, ...(editRef.type === 'website' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setEditRef(p => ({ ...p, type: 'website' }))}
+                      style={{ ...styles.typeButton, ...(editRef.type === 'web' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'web' }))}
                     >
-                      ◎ Website
+                      ◎ Web
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'mobile' }))}
+                    >
+                      ◐ Mobile
                     </button>
                     <button
                       style={{ ...styles.typeButton, ...(editRef.type === 'component' ? styles.typeButtonActive : {}) }}
@@ -729,15 +807,25 @@
                           onChange={e => handleImageNoteChange(img.id, e.target.value, true)}
                           style={styles.imgNoteInput}
                         />
+                        {(editRef.type === 'web' || editRef.type === 'mobile') && (
+                          <label style={styles.componentCheckbox}>
+                            <input
+                              type="checkbox"
+                              checked={img.isComponent || false}
+                              onChange={() => handleToggleComponent(img.id, true)}
+                            />
+                            <span>Component로 추가</span>
+                          </label>
+                        )}
                       </div>
                     ))}
-                    {(editRef.type === 'website' || editRef.images.length === 0) && (
+                    {(editRef.type === 'web' || editRef.type === 'mobile' || editRef.images.length === 0) && (
                       <label style={styles.addImageBtn}>
                         + Add Image
                         <input
                           type="file"
                           accept="image/*"
-                          multiple={editRef.type === 'website'}
+                          multiple={editRef.type === 'web' || editRef.type === 'mobile'}
                           onChange={e => handleImageUpload(e, true)}
                           style={{ display: 'none' }}
                         />
@@ -788,7 +876,7 @@
                   <div style={styles.tagsContainer}>
                     {editRef.tags?.map(tag => (
                       <span key={tag} style={styles.tagChip}>
-                        #{tag}
+                        {tag}
                         <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag, true)}>×</button>
                       </span>
                     ))}
@@ -807,7 +895,7 @@
                       <div style={styles.tagSuggestions}>
                         {filteredTagSuggestions.map(tag => (
                           <button key={tag} style={styles.tagSuggestion} onClick={() => handleAddTag(tag, true)}>
-                            #{tag}
+                            {tag}
                           </button>
                         ))}
                       </div>
@@ -902,8 +990,9 @@
       tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f0ff', color: '#6366f1', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
       tagRemove: { background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '16px', padding: 0 },
       tagInputWrapper: { position: 'relative' },
-      tagSuggestions: { position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto' },
+      tagSuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
       tagSuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      componentCheckbox: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '12px', color: '#6366f1', cursor: 'pointer' },
       submitBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', fontFamily: '"Outfit", sans-serif' },
       editBtns: { display: 'flex', gap: '12px' },
       cancelBtn: { flex: 1, padding: '14px', background: '#f0f0f5', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
