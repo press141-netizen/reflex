@@ -46,83 +46,94 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Generate Figma Plugin API code to recreate this UI. Size: ${width}x${height}px.
+            { type: 'text', text: `Analyze this UI and generate COMPACT Figma Plugin code. Target size: ${width}x${height}px.
 
-Return ONLY JavaScript code (no markdown, no explanation):
+CRITICAL RULES:
+1. FOCUS ON LAYOUT STRUCTURE, not pixel-perfect details
+2. Keep code SHORT - use helper functions for repeated elements
+3. For charts/graphs: create simple PLACEHOLDER rectangles, NOT actual data points
+4. For icons: use small colored rectangles (16-24px)
+5. Group similar items in loops when possible
+6. ALWAYS complete the code - never leave it unfinished
+
+OUTPUT FORMAT - Return ONLY this JavaScript (no markdown):
 
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
   await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
   
+  // Helper: create text
+  const txt = (parent, str, size, color, style = "Regular") => {
+    const t = figma.createText();
+    t.fontName = { family: "Inter", style };
+    t.characters = str;
+    t.fontSize = size;
+    t.fills = [{ type: 'SOLID', color }];
+    parent.appendChild(t);
+    return t;
+  };
+  
+  // Helper: create box
+  const box = (parent, w, h, color, radius = 0) => {
+    const r = figma.createRectangle();
+    r.resize(w, h);
+    r.fills = [{ type: 'SOLID', color }];
+    r.cornerRadius = radius;
+    parent.appendChild(r);
+    return r;
+  };
+  
+  // Helper: create row/column frame
+  const container = (parent, mode, spacing, padding = 0) => {
+    const f = figma.createFrame();
+    f.layoutMode = mode;
+    f.itemSpacing = spacing;
+    f.paddingTop = f.paddingBottom = f.paddingLeft = f.paddingRight = padding;
+    f.fills = [];
+    f.primaryAxisSizingMode = "AUTO";
+    f.counterAxisSizingMode = "AUTO";
+    if (parent) parent.appendChild(f);
+    return f;
+  };
+  
   const frame = figma.createFrame();
-  frame.name = "${componentName || 'GeneratedComponent'}";
+  frame.name = "${componentName || 'Component'}";
   frame.resize(${width}, ${height});
-  frame.fills = [{ type: 'SOLID', color: { r: 0.97, g: 0.97, b: 0.98 } }];
+  frame.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.12 } }]; // Detect actual bg color
   frame.cornerRadius = 16;
   frame.layoutMode = "VERTICAL";
-  frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 16;
-  frame.itemSpacing = 8;
-  frame.primaryAxisSizingMode = "AUTO";
-  frame.counterAxisSizingMode = "AUTO";
+  frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 24;
+  frame.itemSpacing = 24;
+  frame.primaryAxisSizingMode = "FIXED";
+  frame.counterAxisSizingMode = "FIXED";
   
-  // Build UI here...
+  // BUILD STRUCTURE HERE - Focus on main sections:
+  // 1. Header/Title
+  // 2. Main content area (chart = simple placeholder rectangle)
+  // 3. Labels/Legend
+  // 4. Stats/Metrics
   
   figma.currentPage.appendChild(frame);
   figma.viewport.scrollAndZoomIntoView([frame]);
 })();
 
-ELEMENT PATTERNS TO USE:
+CHART/GRAPH HANDLING:
+- Do NOT draw individual data points or lines
+- Create ONE rectangle as chart placeholder:
+  const chartPlaceholder = box(chartArea, 600, 200, { r: 0.15, g: 0.15, b: 0.18 }, 8);
+- Add axis labels below/beside as text
 
-// Menu item row (icon + text)
-const menuItem = figma.createFrame();
-menuItem.name = "MenuItem";
-menuItem.layoutMode = "HORIZONTAL";
-menuItem.counterAxisAlignItems = "CENTER";
-menuItem.itemSpacing = 12;
-menuItem.paddingTop = menuItem.paddingBottom = 12;
-menuItem.paddingLeft = menuItem.paddingRight = 16;
-menuItem.fills = [];
-menuItem.primaryAxisSizingMode = "AUTO";
-menuItem.counterAxisSizingMode = "AUTO";
+EXAMPLE FOR STATS ROW:
+const statsRow = container(frame, "HORIZONTAL", 40);
+["16k", "256", "80"].forEach((val, i) => {
+  const stat = container(statsRow, "VERTICAL", 8);
+  const colors = [{r:0.3,g:0.5,b:1}, {r:0.2,g:0.8,b:0.8}, {r:1,g:0.4,b:0.4}];
+  box(stat, 8, 8, colors[i], 4);
+  txt(stat, val, 48, {r:1,g:1,b:1}, "Semi Bold");
+});
 
-// Active/selected menu item (with colored background)
-menuItem.fills = [{ type: 'SOLID', color: { r: 0.93, g: 0.95, b: 1 } }];
-menuItem.cornerRadius = 8;
-
-// Icon placeholder (square with rounded corners)
-const icon = figma.createRectangle();
-icon.name = "Icon";
-icon.resize(20, 20);
-icon.cornerRadius = 4;
-icon.fills = [{ type: 'SOLID', color: { r: 0.4, g: 0.4, b: 0.9 } }];
-
-// Text label
-const label = figma.createText();
-label.fontName = { family: "Inter", style: "Medium" };
-label.characters = "Menu Item";
-label.fontSize = 14;
-label.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.25 } }];
-
-// Logo (larger rounded rectangle)
-const logo = figma.createRectangle();
-logo.name = "Logo";
-logo.resize(48, 48);
-logo.cornerRadius = 12;
-logo.fills = [{ type: 'SOLID', color: { r: 0.35, g: 0.4, b: 0.95 } }];
-
-// Card container (white background)
-const card = figma.createFrame();
-card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-card.cornerRadius = 12;
-card.effects = [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.08 }, offset: { x: 0, y: 2 }, radius: 8, visible: true, blendMode: 'NORMAL' }];
-
-RULES:
-- Use "FIXED" or "AUTO" for sizing (NEVER "FILL_CONTAINER")
-- Set fontName BEFORE setting characters
-- Match colors from image (backgrounds, text, icons)
-- Create icon placeholders as rectangles with cornerRadius
-- Use layoutMode for all containers` }
+KEEP IT SIMPLE. COMPLETE THE CODE.` }
           ],
         }],
       }),
