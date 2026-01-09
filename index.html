@@ -74,23 +74,13 @@
             const parsed = JSON.parse(saved);
             // 구 데이터 마이그레이션
             return parsed.map(ref => {
-              let next = ref;
               if (ref.thumbnail && !ref.images) {
-                next = {
+                return {
                   ...ref,
-                  images: [{ id: 'migrated', src: ref.thumbnail, note: ref.note || '', figmaCode: ref.figmaCode || null, isComponent: false }],
+                  images: [{ id: 'migrated', src: ref.thumbnail, note: ref.note || '', figmaCode: ref.figmaCode || null }],
                 };
               }
-
-              // color 마이그레이션: 단일 값(id/hex) -> colors 배열(hex)
-              if (next.color && !next.colors) {
-                const COLOR_ID_TO_HEX = { red:'#ef4444', orange:'#f97316', yellow:'#eab308', green:'#22c55e', blue:'#3b82f6', purple:'#8b5cf6', pink:'#ec4899', gray:'#6b7280', black:'#1f2937', white:'#f9fafb' };
-                const hex = COLOR_ID_TO_HEX[next.color] || next.color;
-                next = { ...next, colors: [hex], color: undefined };
-              }
-              if (!next.colors) next = { ...next, colors: [] };
-
-              return next;
+              return ref;
             });
           } catch { return DEFAULT_REFERENCES; }
         }
@@ -112,16 +102,23 @@
       const [showTagSuggestions, setShowTagSuggestions] = useState(false);
       const [categoryInput, setCategoryInput] = useState('');
       const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
-      const addTagInputRef = useRef(null);
-      const addCategoryInputRef = useRef(null);
-      const editTagInputRef = useRef(null);
-      const editCategoryInputRef = useRef(null);
+      const tagInputRef = useRef(null);
+      const categoryInputRef = useRef(null);
       
       // 드롭다운 닫기 - blur 이벤트 사용 (모달과 충돌 방지)
-      const closeSuggestionsOnBlur = (wrapperRef, setOpen) => {
+      const handleTagInputBlur = (e) => {
+        // 드롭다운 내부 클릭 시에는 닫지 않음
         setTimeout(() => {
-          if (!wrapperRef.current?.contains(document.activeElement)) {
-            setOpen(false);
+          if (!tagInputRef.current?.contains(document.activeElement)) {
+            setShowTagSuggestions(false);
+          }
+        }, 150);
+      };
+      
+      const handleCategoryInputBlur = (e) => {
+        setTimeout(() => {
+          if (!categoryInputRef.current?.contains(document.activeElement)) {
+            setShowCategorySuggestions(false);
           }
         }, 150);
       };
@@ -133,10 +130,8 @@
         images: [],
         category: 'Landing',
         tags: [],
-        colors: [], // hex list
+        color: '',
       });
-      const [colorHexInput, setColorHexInput] = useState('');
-      const [editColorHexInput, setEditColorHexInput] = useState('');
 
       // 컬러 옵션
       const COLOR_OPTIONS = [
@@ -201,63 +196,29 @@
         });
       }, [references, activeType, activeCategory, searchQuery, selectedTags]);
 
-      // 브라우저에서 자동 리사이징 + JPEG 압축(품질 70%) 후 dataURL로 저장
-      const compressImageToJpegDataUrl = (file, quality = 0.7, maxDim = 2000) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onerror = () => reject(new Error('File read failed'));
-          reader.onload = () => {
-            const img = new Image();
-            img.onerror = () => reject(new Error('Image load failed'));
-            img.onload = () => {
-              const w = img.naturalWidth || img.width;
-              const h = img.naturalHeight || img.height;
-              const scale = Math.min(1, maxDim / Math.max(w, h));
-              const tw = Math.max(1, Math.round(w * scale));
-              const th = Math.max(1, Math.round(h * scale));
-
-              const canvas = document.createElement('canvas');
-              canvas.width = tw;
-              canvas.height = th;
-              const ctx = canvas.getContext('2d');
-              ctx.imageSmoothingEnabled = true;
-              ctx.imageSmoothingQuality = 'high';
-              ctx.drawImage(img, 0, 0, tw, th);
-
-              const dataUrl = canvas.toDataURL('image/jpeg', quality);
-              resolve({ dataUrl, width: tw, height: th });
-            };
-            img.src = reader.result;
-          };
-          reader.readAsDataURL(file);
-        });
-      };
-
-      // 이미지 업로드 핸들러 (압축 적용)
-      const handleImageUpload = async (e, isEdit = false) => {
+      // 이미지 업로드 핸들러
+      const handleImageUpload = (e, isEdit = false) => {
         const files = Array.from(e.target.files || []);
-        for (const file of files) {
-          if (!file.type.startsWith('image/')) continue;
-          try {
-            const { dataUrl } = await compressImageToJpegDataUrl(file, 0.7, 2000);
-            const newImage = {
-              id: Date.now() + Math.random().toString(36).substr(2, 9),
-              src: dataUrl,
-              note: '',
-              figmaCode: null,
-              isComponent: false,
+        files.forEach(file => {
+          if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              const newImage = {
+                id: Date.now() + Math.random().toString(36).substr(2, 9),
+                src: ev.target.result,
+                note: '',
+                figmaCode: null,
+                isComponent: false,
+              };
+              if (isEdit && editRef) {
+                setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
+              } else {
+                setNewRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
+              }
             };
-            if (isEdit && editRef) {
-              setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
-            } else {
-              setNewRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
-            }
-          } catch (err) {
-            console.error('이미지 처리 실패:', err);
+            reader.readAsDataURL(file);
           }
-        }
-        // 같은 파일을 다시 선택할 수 있도록 reset
-        e.target.value = '';
+        });
       };
 
       // 이미지 삭제
@@ -392,8 +353,7 @@
         
         setReferences(prev => [reference, ...componentRefs, ...prev]);
         setIsAddModalOpen(false);
-        setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [], colors: [] });
-        setColorHexInput('');
+        setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [] });
       };
 
       // 레퍼런스 수정 저장
@@ -452,8 +412,6 @@
               componentName: ref.title,
               imageWidth: imgEl.naturalWidth,
               imageHeight: imgEl.naturalHeight,
-              imageNote: img.note || '',
-              tags: ref.tags || [],
             }),
           });
 
@@ -614,7 +572,7 @@
 
           {/* Detail Modal */}
           {selectedRef && (
-            <div style={styles.modalOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedRef(null); }}>
+            <div style={styles.modalOverlay} onClick={() => setSelectedRef(null)}>
               <div style={styles.modal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
                 
@@ -678,12 +636,8 @@
                           </button>
                         </div>
                         <pre style={styles.figmaCode}>
-                          {selectedRef.images[selectedImageIndex].figmaCode}
+                          {selectedRef.images[selectedImageIndex].figmaCode.slice(0, 300)}...
                         </pre>
-                        <div style={styles.figmaMemo}>
-                          <strong>비고</strong> — Figma에서 <em>Plugins → Development → Import plugin from manifest…</em>로 플러그인 추가 후,
-                          생성된 코드 전체를 붙여넣고 실행하세요.
-                        </div>
                       </>
                     ) : (
                       <button
@@ -718,7 +672,7 @@
 
           {/* Add Modal */}
           {isAddModalOpen && (
-            <div style={styles.modalOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setIsAddModalOpen(false); }}>
+            <div style={styles.modalOverlay} onClick={() => setIsAddModalOpen(false)}>
               <div style={styles.addModal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setIsAddModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Add New Reference</h2>
@@ -824,13 +778,13 @@
                 {/* Category */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Category</label>
-                  <div style={styles.categoryInputWrapper} ref={addCategoryInputRef}>
+                  <div style={styles.categoryInputWrapper} ref={categoryInputRef}>
                     <input
                       type="text"
                       value={newRef.category}
                       onChange={e => { setNewRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
                       onFocus={() => setShowCategorySuggestions(true)}
-                      onBlur={() => closeSuggestionsOnBlur(addCategoryInputRef, setShowCategorySuggestions)}
+                      onBlur={handleCategoryInputBlur}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(newRef.type, newRef.category); } }}
                       style={styles.input}
                       placeholder="카테고리 선택 또는 입력"
@@ -874,13 +828,13 @@
                       </span>
                     ))}
                   </div>
-                  <div style={styles.tagInputWrapper} ref={addTagInputRef}>
+                  <div style={styles.tagInputWrapper} ref={tagInputRef}>
                     <input
                       type="text"
                       value={tagInput}
                       onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
                       onFocus={() => setShowTagSuggestions(true)}
-                      onBlur={() => closeSuggestionsOnBlur(editTagInputRef, setShowTagSuggestions)}
+                      onBlur={handleTagInputBlur}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput); } }}
                       style={styles.input}
                       placeholder="태그 입력 후 Enter"
@@ -897,75 +851,22 @@
                   </div>
                 </div>
 
-                {/* Color */} 
+                {/* Color */}
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Color (multi)</label>
+                  <label style={styles.label}>Color</label>
                   <div style={styles.colorPicker}>
-                    {COLOR_OPTIONS.map(c => {
-                      const active = (newRef.colors || []).includes(c.color);
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          title={c.color}
-                          style={{
-                            ...styles.colorBtn,
-                            backgroundColor: c.color,
-                            ...(active ? styles.colorBtnActive : {})
-                          }}
-                          onClick={() =>
-                            setNewRef(p => {
-                              const cur = p.colors || [];
-                              return active
-                                ? { ...p, colors: cur.filter(x => x !== c.color) }
-                                : { ...p, colors: [...cur, c.color] };
-                            })
-                          }
-                        />
-                      );
-                    })}
+                    {COLOR_OPTIONS.map(c => (
+                      <button
+                        key={c.id}
+                        style={{
+                          ...styles.colorBtn,
+                          backgroundColor: c.color,
+                          ...(newRef.color === c.id ? styles.colorBtnActive : {})
+                        }}
+                        onClick={() => setNewRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
+                      />
+                    ))}
                   </div>
-
-                  <div style={styles.colorHexRow}>
-                    <input
-                      type="text"
-                      value={colorHexInput}
-                      onChange={e => setColorHexInput(e.target.value)}
-                      placeholder="#RRGGBB (직접 추가)"
-                      style={styles.input}
-                    />
-                    <button
-                      type="button"
-                      style={styles.colorHexAddBtn}
-                      onClick={() => {
-                        const v = (colorHexInput || '').trim();
-                        const hex = v.startsWith('#') ? v : `#${v}`;
-                        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
-                        setNewRef(p => ({ ...p, colors: [...(p.colors || []), hex] }));
-                        setColorHexInput('');
-                      }}
-                    >
-                      + Add
-                    </button>
-                  </div>
-
-                  {newRef.colors?.length > 0 && (
-                    <div style={styles.tagsContainer}>
-                      {newRef.colors.map((hex, idx) => (
-                        <span key={hex + idx} style={{ ...styles.tagChip, color: '#334155' }}>
-                          <span style={{ ...styles.colorDot, backgroundColor: hex }} />
-                          {hex}
-                          <button
-                            type="button"
-                            style={styles.tagRemove}
-                            onClick={() => setNewRef(p => ({ ...p, colors: p.colors.filter((_, i) => i !== idx) }))}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <button style={styles.submitBtn} onClick={handleAddReference}>
@@ -977,7 +878,7 @@
 
           {/* Edit Modal */}
           {isEditModalOpen && editRef && (
-            <div style={styles.modalOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setIsEditModalOpen(false); }}>
+            <div style={styles.modalOverlay} onClick={() => setIsEditModalOpen(false)}>
               <div style={styles.addModal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Edit Reference</h2>
@@ -1079,13 +980,12 @@
                 {/* Category */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Category</label>
-                  <div style={styles.categoryInputWrapper} ref={editCategoryInputRef}>
+                  <div style={styles.categoryInputWrapper}>
                     <input
                       type="text"
                       value={editRef.category}
                       onChange={e => { setEditRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
                       onFocus={() => setShowCategorySuggestions(true)}
-                      onBlur={() => closeSuggestionsOnBlur(editCategoryInputRef, setShowCategorySuggestions)}
                       style={styles.input}
                       placeholder="카테고리 선택 또는 입력"
                     />
@@ -1118,13 +1018,13 @@
                       </span>
                     ))}
                   </div>
-                  <div style={styles.tagInputWrapper} ref={editTagInputRef}>
+                  <div style={styles.tagInputWrapper}>
                     <input
                       type="text"
                       value={tagInput}
                       onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
                       onFocus={() => setShowTagSuggestions(true)}
-                      onBlur={() => closeSuggestionsOnBlur(addTagInputRef, setShowTagSuggestions)}
+                      onBlur={handleTagInputBlur}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput, true); } }}
                       style={styles.input}
                       placeholder="태그 입력 후 Enter"
@@ -1141,77 +1041,25 @@
                   </div>
                 </div>
 
-                {/* Color */} 
+                {/* Color */}
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Color (multi)</label>
+                  <label style={styles.label}>Color</label>
                   <div style={styles.colorPicker}>
-                    {COLOR_OPTIONS.map(c => {
-                      const active = (editRef.colors || []).includes(c.color);
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          title={c.color}
-                          style={{
-                            ...styles.colorBtn,
-                            backgroundColor: c.color,
-                            ...(active ? styles.colorBtnActive : {})
-                          }}
-                          onClick={() =>
-                            setEditRef(p => {
-                              const cur = p.colors || [];
-                              return active
-                                ? { ...p, colors: cur.filter(x => x !== c.color) }
-                                : { ...p, colors: [...cur, c.color] };
-                            })
-                          }
-                        />
-                      );
-                    })}
+                    {COLOR_OPTIONS.map(c => (
+                      <button
+                        key={c.id}
+                        style={{
+                          ...styles.colorBtn,
+                          backgroundColor: c.color,
+                          ...(editRef.color === c.id ? styles.colorBtnActive : {})
+                        }}
+                        onClick={() => setEditRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
+                      />
+                    ))}
                   </div>
-
-                  <div style={styles.colorHexRow}>
-                    <input
-                      type="text"
-                      value={editColorHexInput}
-                      onChange={e => setEditColorHexInput(e.target.value)}
-                      placeholder="#RRGGBB (직접 추가)"
-                      style={styles.input}
-                    />
-                    <button
-                      type="button"
-                      style={styles.colorHexAddBtn}
-                      onClick={() => {
-                        const v = (editColorHexInput || '').trim();
-                        const hex = v.startsWith('#') ? v : `#${v}`;
-                        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
-                        setEditRef(p => ({ ...p, colors: [...(p.colors || []), hex] }));
-                        setEditColorHexInput('');
-                      }}
-                    >
-                      + Add
-                    </button>
-                  </div>
-
-                  {editRef.colors?.length > 0 && (
-                    <div style={styles.tagsContainer}>
-                      {editRef.colors.map((hex, idx) => (
-                        <span key={hex + idx} style={{ ...styles.tagChip, color: '#334155' }}>
-                          <span style={{ ...styles.colorDot, backgroundColor: hex }} />
-                          {hex}
-                          <button
-                            type="button"
-                            style={styles.tagRemove}
-                            onClick={() => setEditRef(p => ({ ...p, colors: p.colors.filter((_, i) => i !== idx) }))}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
-<div style={styles.editBtns}>
+
+                <div style={styles.editBtns}>
                   <button style={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>Cancel</button>
                   <button style={styles.submitBtn} onClick={handleSaveEdit}>Save Changes</button>
                 </div>
@@ -1221,7 +1069,7 @@
 
           {/* Image Zoom */}
           {imageZoom && (
-            <div style={styles.zoomOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setImageZoom(null); }}>
+            <div style={styles.zoomOverlay} onClick={() => setImageZoom(null)}>
               <img src={imageZoom} alt="" style={styles.zoomImage} />
             </div>
           )}
@@ -1254,10 +1102,10 @@
       cardContent: { padding: '16px' },
       cardTitle: { fontSize: '16px', fontWeight: '600', marginBottom: '8px', fontFamily: '"Space Grotesk", sans-serif' },
       cardTags: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
-      cardTag: { fontSize: '12px', color: '#6366f1', background: '#f0f0ff', padding: '4px 12px', borderRadius: '6px', border: '1px solid #e0e7ff' },
+      cardTag: { fontSize: '12px', color: '#6366f1', background: '#f0f0ff', padding: '2px 8px', borderRadius: '4px' },
       modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
       modal: { background: '#fff', borderRadius: '20px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflow: 'auto', position: 'relative' },
-      addModal: { background: '#fff', borderRadius: '20px', maxWidth: '760px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '30px', position: 'relative' },
+      addModal: { background: '#fff', borderRadius: '20px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '30px', position: 'relative' },
       modalClose: { position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', background: '#f5f5f5', border: 'none', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', zIndex: 10 },
       imageGallery: { position: 'relative' },
       modalImage: { width: '100%', maxHeight: '400px', objectFit: 'contain', background: '#f5f5f5', cursor: 'zoom-in' },
@@ -1271,13 +1119,12 @@
       modalUrl: { display: 'inline-block', color: '#6366f1', fontSize: '14px', marginBottom: '12px', textDecoration: 'none' },
       modalNote: { color: '#555', fontSize: '15px', lineHeight: 1.6, marginBottom: '16px', padding: '16px', background: '#f9f9f9', borderRadius: '8px', minHeight: '60px' },
       modalTags: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' },
-      modalTag: { fontSize: '13px', color: '#6366f1', background: '#f0f0ff', padding: '4px 12px', borderRadius: '6px', border: '1px solid #e0e7ff' },
+      modalTag: { fontSize: '13px', color: '#6366f1', background: '#f0f0ff', padding: '4px 12px', borderRadius: '6px' },
       figmaSection: { marginBottom: '20px' },
       figmaHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
       copyBtn: { padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', transition: 'all 0.2s' },
       copyBtnSuccess: { background: '#22c55e' },
-      figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace', overflow: 'auto', maxHeight: '280px' },
-      figmaMemo: { marginTop: '10px', padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '10px', color: '#475569', fontSize: '13px', lineHeight: 1.5 },
+      figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '11px', fontFamily: 'monospace', overflow: 'auto', maxHeight: '150px' },
       generateBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' },
       generateBtnDisabled: { background: '#a5a6f6', cursor: 'not-allowed' },
       spinner: { width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
@@ -1306,9 +1153,6 @@
       categorySuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
       categorySuggestionNew: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: '#f0fdf4', color: '#16a34a', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', fontWeight: '500' },
       colorPicker: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-      colorHexRow: { display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' },
-      colorHexAddBtn: { padding: '12px 14px', background: '#111827', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif', fontWeight: '600', whiteSpace: 'nowrap' },
-      colorDot: { width: '10px', height: '10px', borderRadius: '999px', display: 'inline-block', border: '1px solid #e5e7eb', marginRight: '6px' },
       colorBtn: { width: '32px', height: '32px', borderRadius: '50%', border: '2px solid transparent', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' },
       colorBtnActive: { transform: 'scale(1.15)', boxShadow: '0 0 0 3px rgba(99,102,241,0.4)' },
       componentCheckbox: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '12px', color: '#6366f1', cursor: 'pointer' },
@@ -1322,8 +1166,8 @@
       catButtonActive: { background: '#6366f1', color: '#fff' },
       tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
       tagFilterList: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
-      tagFilterBtn: { padding: '4px 12px', background: '#f0f0ff', border: '1px solid #e0e7ff', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#6366f1', transition: 'all 0.2s' },
-      tagFilterBtnActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
+      tagFilterBtn: { padding: '5px 12px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#7c3aed', transition: 'all 0.2s' },
+      tagFilterBtnActive: { background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' },
       clearTagsBtn: { padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif' },
       zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
       zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
