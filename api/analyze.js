@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, componentName, mimeType, imageWidth, imageHeight, imageNote, tags } = req.body;
+    const { image, componentName, mimeType, imageWidth, imageHeight } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image is required' });
@@ -47,15 +47,6 @@ export default async function handler(req, res) {
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
             { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).
-
-CONTEXT (user provided):
-- Image note/description: ${imageNote || 'N/A'}
-- Tags: ${(Array.isArray(tags) ? tags.join(', ') : (tags || 'N/A'))}
-
-IMPORTANT:
-- Use the context to infer whether this is a button, card, modal, form, etc.
-- If context suggests a modal, create an overlay + centered modal frame.
-- If context suggests a list/grid, reflect that structure.
 
 RULES:
 - Return ONLY JavaScript code, no markdown
