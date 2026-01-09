@@ -44,7 +44,7 @@
       component: ['Navigation', 'Hero', 'Button', 'Card', 'Form', 'Modal', 'Sidebar', 'Footer'],
     };
 
-    // 이미지 압축 유틸리티
+    // 이미지 압축 (용량 최적화)
     const compressImage = (file) => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -187,10 +187,9 @@
         });
       }, [references, activeType, activeCategory, searchQuery, selectedTags]);
 
-      // 이미지 업로드 (압축 적용)
+      // 이미지 업로드
       const handleImageUpload = async (e, isEdit = false) => {
         const files = Array.from(e.target.files || []);
-        
         for (const file of files) {
           if (file.type.startsWith('image/')) {
             try {
@@ -202,7 +201,6 @@
                 figmaCode: null,
                 isComponent: false,
               };
-
               if (isEdit && editRef) {
                 setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
               } else {
@@ -217,19 +215,13 @@
       };
 
       const handleRemoveImage = (imgId, isEdit = false) => {
-        if (isEdit) {
-          setEditRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
-        } else {
-          setNewRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
-        }
+        if (isEdit) setEditRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
+        else setNewRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
       };
 
       const handleImageNoteChange = (imgId, note, isEdit = false) => {
-        if (isEdit) {
-          setEditRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, note } : img) }));
-        } else {
-          setNewRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, note } : img) }));
-        }
+        if (isEdit) setEditRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, note } : img) }));
+        else setNewRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, note } : img) }));
       };
 
       const handleAddTag = (tag, isEdit = false) => {
@@ -270,11 +262,8 @@
       };
 
       const handleToggleComponent = (imgId, isEdit = false) => {
-        if (isEdit) {
-          setEditRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, isComponent: !img.isComponent } : img) }));
-        } else {
-          setNewRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, isComponent: !img.isComponent } : img) }));
-        }
+        if (isEdit) setEditRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, isComponent: !img.isComponent } : img) }));
+        else setNewRef(prev => ({ ...prev, images: prev.images.map(img => img.id === imgId ? { ...img, isComponent: !img.isComponent } : img) }));
       };
 
       const handleAddReference = () => {
@@ -322,7 +311,6 @@
         if (!img) return;
 
         setIsGenerating(imgId);
-        
         try {
           let base64Data = img.src;
           let mimeType = 'image/png';
@@ -352,27 +340,19 @@
           });
 
           if (!apiResponse.ok) throw new Error('API failed');
-          
           const result = await apiResponse.json();
-          
           if (result.figmaCode) {
             setReferences(prev => prev.map(r => {
               if (r.id !== refId) return r;
-              return {
-                ...r,
-                images: r.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
-              };
+              return { ...r, images: r.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i) };
             }));
             if (selectedRef?.id === refId) {
-              setSelectedRef(prev => ({
-                ...prev,
-                images: prev.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
-              }));
+              setSelectedRef(prev => ({ ...prev, images: prev.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i) }));
             }
           }
         } catch (error) {
           console.error('Figma 생성 실패:', error);
-          alert('Figma 코드 생성에 실패했습니다. API 키나 네트워크를 확인해주세요.');
+          alert('Figma 코드 생성에 실패했습니다. API 키나 폴더 구조(/api/analyze.js)를 확인해주세요.');
         } finally {
           setIsGenerating(null);
         }
@@ -390,20 +370,16 @@
 
       return (
         <div style={styles.container}>
-          {/* Header */}
           <header style={styles.header}>
             <div style={styles.headerInner}>
               <div style={styles.logo}>
                 <span style={styles.logoIcon}>◈</span>
                 <span style={styles.logoText}>Reflex</span>
               </div>
-              <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)}>
-                + Add Reference
-              </button>
+              <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)}>+ Add Reference</button>
             </div>
           </header>
 
-          {/* Filters */}
           <section style={styles.filterSection}>
             <div style={styles.typeToggle}>
               {TYPES.map(type => (
@@ -416,169 +392,88 @@
                 </button>
               ))}
             </div>
-            <input
-              type="text"
-              placeholder="Search title, tags..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={styles.searchInput}
-            />
+            <input type="text" placeholder="Search title, tags..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={styles.searchInput} />
           </section>
 
-          {/* Category Filter */}
           {activeType !== 'all' && (
             <div style={styles.categoryFilterSection}>
               <span style={styles.filterLabel}>Category</span>
               <div style={styles.categoryFilter}>
-                <button
-                  onClick={() => setActiveCategory('all')}
-                  style={{ ...styles.catButton, ...(activeCategory === 'all' ? styles.catButtonActive : {}) }}
-                >
-                  All
-                </button>
+                <button onClick={() => setActiveCategory('all')} style={{ ...styles.catButton, ...(activeCategory === 'all' ? styles.catButtonActive : {}) }}>All</button>
                 {allCategories[activeType]?.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    style={{ ...styles.catButton, ...(activeCategory === cat ? styles.catButtonActive : {}) }}
-                  >
-                    {cat}
-                  </button>
+                  <button key={cat} onClick={() => setActiveCategory(cat)} style={{ ...styles.catButton, ...(activeCategory === cat ? styles.catButtonActive : {}) }}>{cat}</button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Tag Filter */}
           {allTags.length > 0 && (
             <div style={styles.tagFilterSection}>
               <span style={styles.filterLabel}>Tags</span>
               <div style={styles.tagFilterList}>
                 {allTags.slice(0, 15).map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTag(tag)}
-                    style={{ 
-                      ...styles.tagFilterBtn, 
-                      ...(selectedTags.includes(tag) ? styles.tagFilterBtnActive : {}) 
-                    }}
-                  >
-                    {tag}
-                  </button>
+                  <button key={tag} onClick={() => toggleTag(tag)} style={{ ...styles.tagFilterBtn, ...(selectedTags.includes(tag) ? styles.tagFilterBtnActive : {}) }}>{tag}</button>
                 ))}
-                {selectedTags.length > 0 && (
-                  <button style={styles.clearTagsBtn} onClick={() => setSelectedTags([])}>
-                    Clear
-                  </button>
-                )}
+                {selectedTags.length > 0 && <button style={styles.clearTagsBtn} onClick={() => setSelectedTags([])}>Clear</button>}
               </div>
             </div>
           )}
 
-          {/* Grid */}
           <main style={styles.grid}>
             {filteredReferences.map(ref => (
               <article key={ref.id} style={styles.card} onClick={() => { setSelectedRef(ref); setSelectedImageIndex(0); }}>
                 <div style={styles.cardImageWrapper}>
                   <img src={ref.images[0]?.src} alt={ref.title} style={styles.cardImage} />
-                  {ref.images.length > 1 && (
-                    <span style={styles.imageCount}>+{ref.images.length - 1}</span>
-                  )}
-                  {ref.images.some(img => img.figmaCode) && (
-                    <span style={styles.figmaBadge}>◫ AI</span>
-                  )}
+                  {ref.images.length > 1 && <span style={styles.imageCount}>+{ref.images.length - 1}</span>}
+                  {ref.images.some(img => img.figmaCode) && <span style={styles.figmaBadge}>◫ AI</span>}
                 </div>
                 <div style={styles.cardContent}>
                   <h3 style={styles.cardTitle}>{ref.title}</h3>
-                  <div style={styles.cardTags}>
-                    {ref.tags?.slice(0, 3).map(tag => (
-                      <span key={tag} style={styles.cardTag}>{tag}</span>
-                    ))}
-                  </div>
+                  <div style={styles.cardTags}>{ref.tags?.slice(0, 3).map(tag => <span key={tag} style={styles.cardTag}>{tag}</span>)}</div>
                 </div>
               </article>
             ))}
           </main>
 
-          {/* Detail Modal */}
           {selectedRef && (
             <div style={styles.modalOverlay} onClick={() => setSelectedRef(null)}>
               <div style={styles.modal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
-                
                 <div style={styles.imageGallery}>
-                  <img
-                    src={selectedRef.images[selectedImageIndex]?.src}
-                    alt=""
-                    style={styles.modalImage}
-                    onClick={() => setImageZoom(selectedRef.images[selectedImageIndex]?.src)}
-                  />
+                  <img src={selectedRef.images[selectedImageIndex]?.src} alt="" style={styles.modalImage} onClick={() => setImageZoom(selectedRef.images[selectedImageIndex]?.src)} />
                   {selectedRef.images.length > 1 && (
                     <div style={styles.imageThumbs}>
                       {selectedRef.images.map((img, idx) => (
-                        <img
-                          key={img.id}
-                          src={img.src}
-                          alt=""
-                          style={{ ...styles.thumbImg, ...(idx === selectedImageIndex ? styles.thumbImgActive : {}) }}
-                          onClick={() => setSelectedImageIndex(idx)}
-                        />
+                        <img key={img.id} src={img.src} alt="" style={{ ...styles.thumbImg, ...(idx === selectedImageIndex ? styles.thumbImgActive : {}) }} onClick={() => setSelectedImageIndex(idx)} />
                       ))}
                     </div>
                   )}
                 </div>
-
                 <div style={styles.modalContent}>
                   <div style={styles.modalMeta}>
                     <span style={styles.modalType}>{TYPES.find(t => t.id === selectedRef.type)?.emoji} {selectedRef.type}</span>
-                    <span>•</span>
-                    <span>{selectedRef.category}</span>
+                    <span>•</span><span>{selectedRef.category}</span>
                   </div>
                   <h2 style={styles.modalTitle}>{selectedRef.title}</h2>
-                  {selectedRef.url && (
-                    <a href={selectedRef.url} target="_blank" style={styles.modalUrl}>{selectedRef.url} ↗</a>
-                  )}
-                  
-                  {selectedRef.images[selectedImageIndex]?.note && (
-                    <p style={styles.modalNote}>{selectedRef.images[selectedImageIndex].note}</p>
-                  )}
-
-                  <div style={styles.modalTags}>
-                    {selectedRef.tags?.map(tag => (
-                      <span key={tag} style={styles.modalTag}>{tag}</span>
-                    ))}
-                  </div>
+                  {selectedRef.url && <a href={selectedRef.url} target="_blank" style={styles.modalUrl}>{selectedRef.url} ↗</a>}
+                  {selectedRef.images[selectedImageIndex]?.note && <p style={styles.modalNote}>{selectedRef.images[selectedImageIndex].note}</p>}
+                  <div style={styles.modalTags}>{selectedRef.tags?.map(tag => <span key={tag} style={styles.modalTag}>{tag}</span>)}</div>
 
                   <div style={styles.figmaSection}>
                     {selectedRef.images[selectedImageIndex]?.figmaCode ? (
                       <>
                         <div style={styles.figmaHeader}>
                           <span>◫ Figma Plugin Code</span>
-                          <button
-                            style={{ ...styles.copyBtn, ...(copySuccess ? styles.copyBtnSuccess : {}) }}
-                            onClick={() => copyToClipboard(selectedRef.images[selectedImageIndex].figmaCode)}
-                          >
+                          <button style={{ ...styles.copyBtn, ...(copySuccess ? styles.copyBtnSuccess : {}) }} onClick={() => copyToClipboard(selectedRef.images[selectedImageIndex].figmaCode)}>
                             {copySuccess ? '✓ Copied!' : 'Copy Code'}
                           </button>
                         </div>
-                        <div style={styles.codeWrapper}>
-                          <pre style={styles.figmaCode}>
-                            {selectedRef.images[selectedImageIndex].figmaCode}
-                          </pre>
-                        </div>
+                        <div style={styles.codeWrapper}><pre style={styles.figmaCode}>{selectedRef.images[selectedImageIndex].figmaCode}</pre></div>
                         <p style={{fontSize: '12px', color: '#888', marginTop: '8px'}}>* Figma에서 Plugins &gt; Development &gt; New Plugin을 열고 위 코드를 붙여넣으세요.</p>
                       </>
                     ) : (
-                      <button
-                        style={{ ...styles.generateBtn, ...(isGenerating ? styles.generateBtnDisabled : {}) }}
-                        onClick={() => handleGenerateFigma(selectedRef.id, selectedRef.images[selectedImageIndex].id)}
-                        disabled={isGenerating}
-                      >
-                        {isGenerating === selectedRef.images[selectedImageIndex]?.id ? (
-                          <><span style={styles.spinner}></span> Analyzing Design...</>
-                        ) : (
-                          '◫ Generate Figma Component Code (AI)'
-                        )}
+                      <button style={{ ...styles.generateBtn, ...(isGenerating ? styles.generateBtnDisabled : {}) }} onClick={() => handleGenerateFigma(selectedRef.id, selectedRef.images[selectedImageIndex].id)} disabled={isGenerating}>
+                        {isGenerating === selectedRef.images[selectedImageIndex]?.id ? <><span style={styles.spinner}></span> Analyzing Design...</> : '◫ Generate Figma Component Code (AI)'}
                       </button>
                     )}
                   </div>
@@ -586,12 +481,8 @@
                   <div style={styles.modalFooter}>
                     <span>{selectedRef.addedAt}</span>
                     <div style={styles.modalActions}>
-                      <button style={styles.editBtn} onClick={() => { setEditRef({...selectedRef}); setIsEditModalOpen(true); }}>
-                        ✎ Edit
-                      </button>
-                      <button style={styles.deleteBtn} onClick={() => handleDeleteReference(selectedRef.id)}>
-                        Delete
-                      </button>
+                      <button style={styles.editBtn} onClick={() => { setEditRef({...selectedRef}); setIsEditModalOpen(true); }}>✎ Edit</button>
+                      <button style={styles.deleteBtn} onClick={() => handleDeleteReference(selectedRef.id)}>Delete</button>
                     </div>
                   </div>
                 </div>
@@ -599,143 +490,51 @@
             </div>
           )}
 
-          {/* [수정됨] Add Modal UI 복구 */}
           {isAddModalOpen && (
             <div style={styles.modalOverlay} onClick={() => setIsAddModalOpen(false)}>
               <div style={styles.addModal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setIsAddModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Add New Reference</h2>
-
+                {/* [수정됨] 폼 UI 복구 완료 */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Type</label>
                   <div style={styles.typeToggle}>
-                    <button
-                      style={{ ...styles.typeButton, ...(newRef.type === 'web' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setNewRef(p => ({ ...p, type: 'web', category: 'Landing' }))}
-                    >
-                      ◎ Web
-                    </button>
-                    <button
-                      style={{ ...styles.typeButton, ...(newRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setNewRef(p => ({ ...p, type: 'mobile', category: 'iOS' }))}
-                    >
-                      ◐ Mobile
-                    </button>
-                    <button
-                      style={{ ...styles.typeButton, ...(newRef.type === 'graphic' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setNewRef(p => ({ ...p, type: 'graphic', category: 'Poster' }))}
-                    >
-                      ◈ Graphic
-                    </button>
-                    <button
-                      style={{ ...styles.typeButton, ...(newRef.type === 'component' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setNewRef(p => ({ ...p, type: 'component', category: 'Navigation' }))}
-                    >
-                      ◫ Component
-                    </button>
+                    <button style={{ ...styles.typeButton, ...(newRef.type === 'web' ? styles.typeButtonActive : {}) }} onClick={() => setNewRef(p => ({ ...p, type: 'web', category: 'Landing' }))}>◎ Web</button>
+                    <button style={{ ...styles.typeButton, ...(newRef.type === 'mobile' ? styles.typeButtonActive : {}) }} onClick={() => setNewRef(p => ({ ...p, type: 'mobile', category: 'iOS' }))}>◐ Mobile</button>
+                    <button style={{ ...styles.typeButton, ...(newRef.type === 'graphic' ? styles.typeButtonActive : {}) }} onClick={() => setNewRef(p => ({ ...p, type: 'graphic', category: 'Poster' }))}>◈ Graphic</button>
+                    <button style={{ ...styles.typeButton, ...(newRef.type === 'component' ? styles.typeButtonActive : {}) }} onClick={() => setNewRef(p => ({ ...p, type: 'component', category: 'Navigation' }))}>◫ Component</button>
                   </div>
                 </div>
 
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    Images {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') ? '(여러 장 가능)' : '(1장)'}
-                  </label>
+                  <label style={styles.label}>Images</label>
                   <div style={styles.imageUploadArea}>
                     {newRef.images.map(img => (
                       <div key={img.id} style={styles.uploadedImage}>
                         <img src={img.src} alt="" style={styles.uploadedThumb} />
                         <button style={styles.removeImgBtn} onClick={() => handleRemoveImage(img.id)}>✕</button>
-                        <textarea
-                          placeholder="이미지 설명..."
-                          value={img.note}
-                          onChange={e => handleImageNoteChange(img.id, e.target.value)}
-                          style={styles.imgNoteInput}
-                        />
-                        {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') && (
-                          <label style={styles.componentCheckbox}>
-                            <input
-                              type="checkbox"
-                              checked={img.isComponent || false}
-                              onChange={() => handleToggleComponent(img.id)}
-                            />
-                            <span>Component로 추가</span>
-                          </label>
-                        )}
+                        <textarea placeholder="이미지 설명..." value={img.note} onChange={e => handleImageNoteChange(img.id, e.target.value)} style={styles.imgNoteInput} />
                       </div>
                     ))}
-                    {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic' || newRef.images.length === 0) && (
-                      <label style={styles.addImageBtn}>
-                        + Add Image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple={newRef.type !== 'component'}
-                          onChange={e => handleImageUpload(e)}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                    )}
+                    <label style={styles.addImageBtn}>
+                      + Add Image
+                      <input type="file" accept="image/*" multiple onChange={e => handleImageUpload(e)} style={{ display: 'none' }} />
+                    </label>
                   </div>
                 </div>
 
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Title *</label>
-                  <input
-                    type="text"
-                    value={newRef.title}
-                    onChange={e => setNewRef(p => ({ ...p, title: e.target.value }))}
-                    style={styles.input}
-                    placeholder="e.g., Linear Homepage"
-                  />
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>URL</label>
-                  <input
-                    type="url"
-                    value={newRef.url}
-                    onChange={e => setNewRef(p => ({ ...p, url: e.target.value }))}
-                    style={styles.input}
-                    placeholder="[https://example.com](https://example.com)"
-                  />
-                </div>
-
+                <div style={styles.formGroup}><label style={styles.label}>Title *</label><input type="text" value={newRef.title} onChange={e => setNewRef(p => ({ ...p, title: e.target.value }))} style={styles.input} /></div>
+                <div style={styles.formGroup}><label style={styles.label}>URL</label><input type="url" value={newRef.url} onChange={e => setNewRef(p => ({ ...p, url: e.target.value }))} style={styles.input} /></div>
+                
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Category</label>
-                  <div style={styles.categoryInputWrapper} ref={categoryInputRef}>
-                    <input
-                      type="text"
-                      value={newRef.category}
-                      onChange={e => { setNewRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
-                      onFocus={() => setShowCategorySuggestions(true)}
-                      onBlur={handleCategoryInputBlur}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(newRef.type, newRef.category); } }}
-                      style={styles.input}
-                      placeholder="카테고리 선택 또는 입력"
-                    />
+                  <div style={styles.categoryInputWrapper}>
+                    <input type="text" value={newRef.category} onChange={e => { setNewRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }} onFocus={() => setShowCategorySuggestions(true)} style={styles.input} />
                     {showCategorySuggestions && allCategories[newRef.type]?.length > 0 && (
                       <div style={styles.categorySuggestions}>
-                        {allCategories[newRef.type]
-                          .filter(cat => cat.toLowerCase().includes(newRef.category.toLowerCase()))
-                          .map(cat => (
-                            <button 
-                              key={cat} 
-                              style={styles.categorySuggestion}
-                              onMouseDown={e => e.preventDefault()}
-                              onClick={() => { setNewRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
-                            >
-                              {cat}
-                            </button>
-                          ))}
-                        {newRef.category && !allCategories[newRef.type]?.includes(newRef.category) && (
-                          <button 
-                            style={styles.categorySuggestionNew}
-                            onMouseDown={e => e.preventDefault()}
-                            onClick={() => handleAddCategory(newRef.type, newRef.category)}
-                          >
-                            + "{newRef.category}" 추가
-                          </button>
-                        )}
+                        {allCategories[newRef.type].filter(cat => cat.toLowerCase().includes(newRef.category.toLowerCase())).map(cat => (
+                          <button key={cat} style={styles.categorySuggestion} onClick={() => { setNewRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}>{cat}</button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -744,97 +543,38 @@
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Tags</label>
                   <div style={styles.tagsContainer}>
-                    {newRef.tags.map(tag => (
-                      <span key={tag} style={styles.tagChip}>
-                        {tag}
-                        <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag)}>×</button>
-                      </span>
-                    ))}
+                    {newRef.tags.map(tag => <span key={tag} style={styles.tagChip}>{tag}<button style={styles.tagRemove} onClick={() => handleRemoveTag(tag)}>×</button></span>)}
                   </div>
-                  <div style={styles.tagInputWrapper} ref={tagInputRef}>
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
-                      onFocus={() => setShowTagSuggestions(true)}
-                      onBlur={handleTagInputBlur}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput); } }}
-                      style={styles.input}
-                      placeholder="태그 입력 후 Enter"
-                    />
+                  <div style={styles.tagInputWrapper}>
+                    <input type="text" value={tagInput} onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }} onFocus={() => setShowTagSuggestions(true)} onBlur={handleTagInputBlur} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput); } }} style={styles.input} placeholder="태그 입력 후 Enter" />
                     {showTagSuggestions && filteredTagSuggestions.length > 0 && (
                       <div style={styles.tagSuggestions}>
-                        {filteredTagSuggestions.map(tag => (
-                          <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag)}>
-                            {tag}
-                          </button>
-                        ))}
+                        {filteredTagSuggestions.map(tag => <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag)}>{tag}</button>)}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Color</label>
-                  <div style={styles.colorPicker}>
-                    {COLOR_OPTIONS.map(c => (
-                      <button
-                        key={c.id}
-                        style={{
-                          ...styles.colorBtn,
-                          backgroundColor: c.color,
-                          ...(newRef.color === c.id ? styles.colorBtnActive : {})
-                        }}
-                        onClick={() => setNewRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <button style={styles.submitBtn} onClick={handleAddReference}>
-                  Add Reference
-                </button>
+                <button style={styles.submitBtn} onClick={handleAddReference}>Add Reference</button>
               </div>
             </div>
           )}
-
-          {/* Edit Modal */}
+          
+          {/* Edit Modal (생략 없이 포함) */}
           {isEditModalOpen && editRef && (
             <div style={styles.modalOverlay} onClick={() => setIsEditModalOpen(false)}>
               <div style={styles.addModal} onClick={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Edit Reference</h2>
-
+                {/* Edit Form Fields */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Type</label>
                   <div style={styles.typeToggle}>
-                    <button
-                      style={{ ...styles.typeButton, ...(editRef.type === 'web' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setEditRef(p => ({ ...p, type: 'web' }))}
-                    >
-                      ◎ Web
-                    </button>
-                    <button
-                      style={{ ...styles.typeButton, ...(editRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setEditRef(p => ({ ...p, type: 'mobile' }))}
-                    >
-                      ◐ Mobile
-                    </button>
-                    <button
-                      style={{ ...styles.typeButton, ...(editRef.type === 'graphic' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setEditRef(p => ({ ...p, type: 'graphic' }))}
-                    >
-                      ◈ Graphic
-                    </button>
-                    <button
-                      style={{ ...styles.typeButton, ...(editRef.type === 'component' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setEditRef(p => ({ ...p, type: 'component' }))}
-                    >
-                      ◫ Component
-                    </button>
+                    {['web','mobile','graphic','component'].map(t => (
+                      <button key={t} style={{...styles.typeButton, ...(editRef.type===t?styles.typeButtonActive:{})}} onClick={()=>setEditRef(p=>({...p, type:t}))}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>
+                    ))}
                   </div>
                 </div>
-
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Images</label>
                   <div style={styles.imageUploadArea}>
@@ -842,138 +582,15 @@
                       <div key={img.id} style={styles.uploadedImage}>
                         <img src={img.src} alt="" style={styles.uploadedThumb} />
                         <button style={styles.removeImgBtn} onClick={() => handleRemoveImage(img.id, true)}>✕</button>
-                        <textarea
-                          placeholder="이미지 설명..."
-                          value={img.note}
-                          onChange={e => handleImageNoteChange(img.id, e.target.value, true)}
-                          style={styles.imgNoteInput}
-                        />
-                        {editRef.type !== 'component' && (
-                          <label style={styles.componentCheckbox}>
-                            <input
-                              type="checkbox"
-                              checked={img.isComponent || false}
-                              onChange={() => handleToggleComponent(img.id, true)}
-                            />
-                            <span>Component로 추가</span>
-                          </label>
-                        )}
+                        <textarea value={img.note} onChange={e => handleImageNoteChange(img.id, e.target.value, true)} style={styles.imgNoteInput} />
                       </div>
                     ))}
-                    {(editRef.type !== 'component' || editRef.images.length === 0) && (
-                      <label style={styles.addImageBtn}>
-                        + Add Image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple={editRef.type !== 'component'}
-                          onChange={e => handleImageUpload(e, true)}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                    )}
+                    <label style={styles.addImageBtn}>+ Add Image<input type="file" accept="image/*" multiple onChange={e => handleImageUpload(e, true)} style={{ display: 'none' }} /></label>
                   </div>
                 </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Title *</label>
-                  <input
-                    type="text"
-                    value={editRef.title}
-                    onChange={e => setEditRef(p => ({ ...p, title: e.target.value }))}
-                    style={styles.input}
-                  />
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>URL</label>
-                  <input
-                    type="url"
-                    value={editRef.url || ''}
-                    onChange={e => setEditRef(p => ({ ...p, url: e.target.value }))}
-                    style={styles.input}
-                  />
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Category</label>
-                  <div style={styles.categoryInputWrapper}>
-                    <input
-                      type="text"
-                      value={editRef.category}
-                      onChange={e => { setEditRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
-                      onFocus={() => setShowCategorySuggestions(true)}
-                      style={styles.input}
-                      placeholder="카테고리 선택 또는 입력"
-                    />
-                    {showCategorySuggestions && allCategories[editRef.type]?.length > 0 && (
-                      <div style={styles.categorySuggestions}>
-                        {allCategories[editRef.type]
-                          .filter(cat => cat.toLowerCase().includes((editRef.category || '').toLowerCase()))
-                          .map(cat => (
-                            <button 
-                              key={cat} 
-                              style={styles.categorySuggestion} 
-                              onClick={() => { setEditRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
-                            >
-                              {cat}
-                            </button>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Tags</label>
-                  <div style={styles.tagsContainer}>
-                    {editRef.tags?.map(tag => (
-                      <span key={tag} style={styles.tagChip}>
-                        {tag}
-                        <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag, true)}>×</button>
-                      </span>
-                    ))}
-                  </div>
-                  <div style={styles.tagInputWrapper}>
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
-                      onFocus={() => setShowTagSuggestions(true)}
-                      onBlur={handleTagInputBlur}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput, true); } }}
-                      style={styles.input}
-                      placeholder="태그 입력 후 Enter"
-                    />
-                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
-                      <div style={styles.tagSuggestions}>
-                        {filteredTagSuggestions.map(tag => (
-                          <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag, true)}>
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Color</label>
-                  <div style={styles.colorPicker}>
-                    {COLOR_OPTIONS.map(c => (
-                      <button
-                        key={c.id}
-                        style={{
-                          ...styles.colorBtn,
-                          backgroundColor: c.color,
-                          ...(editRef.color === c.id ? styles.colorBtnActive : {})
-                        }}
-                        onClick={() => setEditRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
-                      />
-                    ))}
-                  </div>
-                </div>
-
+                <div style={styles.formGroup}><label style={styles.label}>Title</label><input type="text" value={editRef.title} onChange={e => setEditRef(p=>({...p, title:e.target.value}))} style={styles.input} /></div>
+                <div style={styles.formGroup}><label style={styles.label}>URL</label><input type="url" value={editRef.url||''} onChange={e => setEditRef(p=>({...p, url:e.target.value}))} style={styles.input} /></div>
+                
                 <div style={styles.editBtns}>
                   <button style={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>Cancel</button>
                   <button style={styles.submitBtn} onClick={handleSaveEdit}>Save Changes</button>
@@ -981,7 +598,7 @@
               </div>
             </div>
           )}
-          
+
           {imageZoom && (
             <div style={styles.zoomOverlay} onClick={() => setImageZoom(null)}>
               <img src={imageZoom} alt="" style={styles.zoomImage} />
@@ -1072,7 +689,6 @@
       categoryInputWrapper: { position: 'relative' },
       categorySuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
       categorySuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
-      categorySuggestionNew: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: '#f0fdf4', color: '#16a34a', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', fontWeight: '500' },
       colorPicker: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
       colorBtn: { width: '32px', height: '32px', borderRadius: '50%', border: '2px solid transparent', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' },
       colorBtnActive: { transform: 'scale(1.15)', boxShadow: '0 0 0 3px rgba(99,102,241,0.4)' },
