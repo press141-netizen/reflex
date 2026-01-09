@@ -41,111 +41,71 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
+        max_tokens: 8000,
         messages: [{
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Analyze this UI and generate COMPACT Figma Plugin code. Target size: ${width}x${height}px.
+            { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).
 
-CRITICAL RULES:
-1. FOCUS ON LAYOUT STRUCTURE, not pixel-perfect details
-2. Keep code SHORT - use helper functions for repeated elements
-3. For charts/graphs: create simple PLACEHOLDER rectangles, NOT actual data points
-4. For icons: use small colored rectangles (16-24px)
-5. Group similar items in loops when possible
-6. ALWAYS complete the code - never leave it unfinished
+RULES:
+- Return ONLY JavaScript code, no markdown
+- Use helpers: txt(), box(), container() as shown below
+- Charts/graphs = single placeholder rectangle
+- Icons = small colored rectangles
+- MUST end with figma.currentPage.appendChild() and figma.viewport.scrollAndZoomIntoView()
+- All frames with fixed size need: primaryAxisSizingMode = "FIXED"; counterAxisSizingMode = "FIXED";
 
-OUTPUT FORMAT - Return ONLY this JavaScript (no markdown):
-
+START CODE:
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
   await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
   
-  // Helper: create text
-  const txt = (parent, str, size, color, style = "Regular") => {
-    const t = figma.createText();
-    t.fontName = { family: "Inter", style };
-    t.characters = str;
-    t.fontSize = size;
-    t.fills = [{ type: 'SOLID', color }];
-    parent.appendChild(t);
-    return t;
-  };
-  
-  // Helper: create box
-  const box = (parent, w, h, color, radius = 0) => {
-    const r = figma.createRectangle();
-    r.resize(w, h);
-    r.fills = [{ type: 'SOLID', color }];
-    r.cornerRadius = radius;
-    parent.appendChild(r);
-    return r;
-  };
-  
-  // Helper: create row/column frame
-  const container = (parent, mode, spacing, padding = 0) => {
-    const f = figma.createFrame();
-    f.layoutMode = mode;
-    f.itemSpacing = spacing;
-    f.paddingTop = f.paddingBottom = f.paddingLeft = f.paddingRight = padding;
-    f.fills = [];
-    f.primaryAxisSizingMode = "AUTO";
-    f.counterAxisSizingMode = "AUTO";
-    if (parent) parent.appendChild(f);
-    return f;
-  };
+  const txt = (p, s, sz, c, st = "Regular") => { const t = figma.createText(); t.fontName = { family: "Inter", style: st }; t.characters = s; t.fontSize = sz; t.fills = [{ type: 'SOLID', color: c }]; p.appendChild(t); return t; };
+  const box = (p, w, h, c, r = 0) => { const b = figma.createRectangle(); b.resize(w, h); b.fills = [{ type: 'SOLID', color: c }]; b.cornerRadius = r; p.appendChild(b); return b; };
+  const row = (p, gap) => { const f = figma.createFrame(); f.layoutMode = "HORIZONTAL"; f.itemSpacing = gap; f.fills = []; f.counterAxisAlignItems = "CENTER"; f.primaryAxisSizingMode = "AUTO"; f.counterAxisSizingMode = "AUTO"; if(p) p.appendChild(f); return f; };
+  const col = (p, gap) => { const f = figma.createFrame(); f.layoutMode = "VERTICAL"; f.itemSpacing = gap; f.fills = []; f.primaryAxisSizingMode = "AUTO"; f.counterAxisSizingMode = "AUTO"; if(p) p.appendChild(f); return f; };
   
   const frame = figma.createFrame();
   frame.name = "${componentName || 'Component'}";
   frame.resize(${width}, ${height});
-  frame.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.12 } }]; // Detect actual bg color
-  frame.cornerRadius = 16;
   frame.layoutMode = "VERTICAL";
-  frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 24;
-  frame.itemSpacing = 24;
   frame.primaryAxisSizingMode = "FIXED";
   frame.counterAxisSizingMode = "FIXED";
-  
-  // BUILD STRUCTURE HERE - Focus on main sections:
-  // 1. Header/Title
-  // 2. Main content area (chart = simple placeholder rectangle)
-  // 3. Labels/Legend
-  // 4. Stats/Metrics
+  // Continue building UI...
   
   figma.currentPage.appendChild(frame);
   figma.viewport.scrollAndZoomIntoView([frame]);
 })();
 
-CHART/GRAPH HANDLING:
-- Do NOT draw individual data points or lines
-- Create ONE rectangle as chart placeholder:
-  const chartPlaceholder = box(chartArea, 600, 200, { r: 0.15, g: 0.15, b: 0.18 }, 8);
-- Add axis labels below/beside as text
-
-EXAMPLE FOR STATS ROW:
-const statsRow = container(frame, "HORIZONTAL", 40);
-["16k", "256", "80"].forEach((val, i) => {
-  const stat = container(statsRow, "VERTICAL", 8);
-  const colors = [{r:0.3,g:0.5,b:1}, {r:0.2,g:0.8,b:0.8}, {r:1,g:0.4,b:0.4}];
-  box(stat, 8, 8, colors[i], 4);
-  txt(stat, val, 48, {r:1,g:1,b:1}, "Semi Bold");
-});
-
-KEEP IT SIMPLE. COMPLETE THE CODE.` }
+Analyze the image and complete the code. Keep it concise but complete.` }
           ],
         }],
       }),
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: 'API failed' });
+      const errorData = await response.json().catch(() => ({}));
+      return res.status(response.status).json({ error: 'API failed', details: errorData });
     }
 
     const data = await response.json();
     let code = data.content?.[0]?.text || '';
+    
+    // Clean up markdown formatting
     code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
+    
+    // Validate code completeness
+    if (!code.includes('figma.currentPage.appendChild') || !code.includes('figma.viewport.scrollAndZoomIntoView')) {
+      // Try to fix incomplete code
+      if (!code.includes('figma.currentPage.appendChild')) {
+        code = code.replace(/\}\)\(\);?\s*$/, `
+  figma.currentPage.appendChild(frame);
+  figma.viewport.scrollAndZoomIntoView([frame]);
+})();`);
+      }
+    }
 
     return res.status(200).json({ success: true, figmaCode: code });
 
