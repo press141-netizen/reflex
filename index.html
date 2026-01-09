@@ -27,36 +27,15 @@
       { id: 'all', name: 'All', emoji: '✦' },
       { id: 'web', name: 'Web', emoji: '◎' },
       { id: 'mobile', name: 'Mobile', emoji: '◐' },
+      { id: 'graphic', name: 'Graphic', emoji: '◈' },
       { id: 'component', name: 'Component', emoji: '◫' },
     ];
 
-    const CATEGORIES = {
-      web: [
-        { id: 'all', name: 'All', emoji: '✦' },
-        { id: 'landing', name: 'Landing', emoji: '◎' },
-        { id: 'portfolio', name: 'Portfolio', emoji: '◐' },
-        { id: 'ecommerce', name: 'E-commerce', emoji: '◈' },
-        { id: 'dashboard', name: 'Dashboard', emoji: '▣' },
-        { id: 'blog', name: 'Blog', emoji: '▤' },
-        { id: 'corporate', name: 'Corporate', emoji: '◧' },
-      ],
-      mobile: [
-        { id: 'all', name: 'All', emoji: '✦' },
-        { id: 'ios', name: 'iOS', emoji: '◎' },
-        { id: 'android', name: 'Android', emoji: '◐' },
-        { id: 'app', name: 'App', emoji: '◈' },
-        { id: 'onboarding', name: 'Onboarding', emoji: '▣' },
-      ],
-      component: [
-        { id: 'all', name: 'All', emoji: '✦' },
-        { id: 'navigation', name: 'Navigation', emoji: '☰' },
-        { id: 'hero', name: 'Hero', emoji: '◐' },
-        { id: 'button', name: 'Button', emoji: '▢' },
-        { id: 'card', name: 'Card', emoji: '▣' },
-        { id: 'form', name: 'Form', emoji: '▤' },
-        { id: 'modal', name: 'Modal', emoji: '◳' },
-        { id: 'sidebar', name: 'Sidebar', emoji: '◧' },
-      ],
+    const DEFAULT_CATEGORIES = {
+      web: ['Landing', 'Portfolio', 'E-commerce', 'Dashboard', 'Blog', 'Corporate'],
+      mobile: ['iOS', 'Android', 'App', 'Onboarding'],
+      graphic: ['Poster', 'Banner', 'Icon', 'Illustration', 'Logo', 'Print'],
+      component: ['Navigation', 'Hero', 'Button', 'Card', 'Form', 'Modal', 'Sidebar', 'Footer'],
     };
 
     // 새로운 데이터 구조: images 배열 (각 이미지별 note, figmaCode, isComponent)
@@ -121,6 +100,24 @@
       const [isGenerating, setIsGenerating] = useState(null); // 이미지 ID
       const [tagInput, setTagInput] = useState('');
       const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+      const [categoryInput, setCategoryInput] = useState('');
+      const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+      const tagInputRef = useRef(null);
+      const categoryInputRef = useRef(null);
+      
+      // 외부 클릭 시 드롭다운 닫기
+      useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (tagInputRef.current && !tagInputRef.current.contains(e.target)) {
+            setShowTagSuggestions(false);
+          }
+          if (categoryInputRef.current && !categoryInputRef.current.contains(e.target)) {
+            setShowCategorySuggestions(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, []);
       
       const [newRef, setNewRef] = useState({
         type: 'web',
@@ -143,14 +140,37 @@
         return Array.from(tags).sort();
       }, [references]);
 
-      // 필터링
+      // 커스텀 카테고리 (localStorage에서 로드)
+      const [customCategories, setCustomCategories] = useState(() => {
+        const saved = localStorage.getItem('reflex-custom-categories');
+        return saved ? JSON.parse(saved) : { web: [], mobile: [], graphic: [], component: [] };
+      });
+
+      // 커스텀 카테고리 저장
+      useEffect(() => {
+        localStorage.setItem('reflex-custom-categories', JSON.stringify(customCategories));
+      }, [customCategories]);
+
+      // 전체 카테고리 (기본 + 커스텀)
+      const allCategories = useMemo(() => {
+        const result = {};
+        Object.keys(DEFAULT_CATEGORIES).forEach(type => {
+          result[type] = [...DEFAULT_CATEGORIES[type], ...(customCategories[type] || [])];
+        });
+        return result;
+      }, [customCategories]);
+
+      // 필터링 (검색에 note 포함)
       const filteredReferences = useMemo(() => {
         return references.filter(ref => {
           if (activeType !== 'all' && ref.type !== activeType) return false;
           if (activeCategory !== 'all' && ref.category !== activeCategory) return false;
           if (searchQuery) {
             const q = searchQuery.toLowerCase();
-            if (!ref.title.toLowerCase().includes(q) && !ref.tags?.some(t => t.toLowerCase().includes(q))) return false;
+            const titleMatch = ref.title.toLowerCase().includes(q);
+            const tagMatch = ref.tags?.some(t => t.toLowerCase().includes(q));
+            const noteMatch = ref.images?.some(img => img.note?.toLowerCase().includes(q));
+            if (!titleMatch && !tagMatch && !noteMatch) return false;
           }
           if (selectedTags.length > 0 && !selectedTags.every(t => ref.tags?.includes(t))) return false;
           return true;
@@ -237,6 +257,20 @@
         if (!tagInput) return allTags.slice(0, 10);
         return allTags.filter(t => t.includes(tagInput.toLowerCase())).slice(0, 10);
       }, [tagInput, allTags]);
+
+      // 카테고리 추가
+      const handleAddCategory = (type, category) => {
+        const trimmed = category.trim();
+        if (!trimmed) return;
+        if (!allCategories[type]?.includes(trimmed)) {
+          setCustomCategories(prev => ({
+            ...prev,
+            [type]: [...(prev[type] || []), trimmed]
+          }));
+        }
+        setCategoryInput('');
+        setShowCategorySuggestions(false);
+      };
 
       // 날짜 포맷 함수
       const formatDateTime = () => {
@@ -435,7 +469,7 @@
             </div>
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="Search title, tags, description..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={styles.searchInput}
@@ -444,23 +478,32 @@
 
           {/* Category Filter */}
           {activeType !== 'all' && (
-            <div style={styles.categoryFilter}>
-              {CATEGORIES[activeType]?.map(cat => (
+            <div style={styles.categoryFilterSection}>
+              <span style={styles.filterLabel}>Category</span>
+              <div style={styles.categoryFilter}>
                 <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  style={{ ...styles.catButton, ...(activeCategory === cat.id ? styles.catButtonActive : {}) }}
+                  onClick={() => setActiveCategory('all')}
+                  style={{ ...styles.catButton, ...(activeCategory === 'all' ? styles.catButtonActive : {}) }}
                 >
-                  {cat.name}
+                  All
                 </button>
-              ))}
+                {allCategories[activeType]?.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    style={{ ...styles.catButton, ...(activeCategory === cat ? styles.catButtonActive : {}) }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Tag Filter */}
           {allTags.length > 0 && (
             <div style={styles.tagFilterSection}>
-              <span style={styles.tagFilterLabel}>Tags:</span>
+              <span style={styles.filterLabel}>Tags</span>
               <div style={styles.tagFilterList}>
                 {allTags.slice(0, 15).map(tag => (
                   <button
@@ -621,19 +664,25 @@
                   <div style={styles.typeToggle}>
                     <button
                       style={{ ...styles.typeButton, ...(newRef.type === 'web' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setNewRef(p => ({ ...p, type: 'web', category: 'landing' }))}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'web', category: 'Landing' }))}
                     >
                       ◎ Web
                     </button>
                     <button
                       style={{ ...styles.typeButton, ...(newRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setNewRef(p => ({ ...p, type: 'mobile', category: 'ios' }))}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'mobile', category: 'iOS' }))}
                     >
                       ◐ Mobile
                     </button>
                     <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'graphic' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'graphic', category: 'Poster' }))}
+                    >
+                      ◈ Graphic
+                    </button>
+                    <button
                       style={{ ...styles.typeButton, ...(newRef.type === 'component' ? styles.typeButtonActive : {}) }}
-                      onClick={() => setNewRef(p => ({ ...p, type: 'component', category: 'navigation' }))}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'component', category: 'Navigation' }))}
                     >
                       ◫ Component
                     </button>
@@ -643,7 +692,7 @@
                 {/* Images */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
-                    Images {(newRef.type === 'web' || newRef.type === 'mobile') ? '(여러 장 가능)' : '(1장)'}
+                    Images {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') ? '(여러 장 가능)' : '(1장)'}
                   </label>
                   <div style={styles.imageUploadArea}>
                     {newRef.images.map(img => (
@@ -656,7 +705,7 @@
                           onChange={e => handleImageNoteChange(img.id, e.target.value)}
                           style={styles.imgNoteInput}
                         />
-                        {(newRef.type === 'web' || newRef.type === 'mobile') && (
+                        {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') && (
                           <label style={styles.componentCheckbox}>
                             <input
                               type="checkbox"
@@ -668,13 +717,13 @@
                         )}
                       </div>
                     ))}
-                    {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.images.length === 0) && (
+                    {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic' || newRef.images.length === 0) && (
                       <label style={styles.addImageBtn}>
                         + Add Image
                         <input
                           type="file"
                           accept="image/*"
-                          multiple={newRef.type === 'web' || newRef.type === 'mobile'}
+                          multiple={newRef.type !== 'component'}
                           onChange={e => handleImageUpload(e)}
                           style={{ display: 'none' }}
                         />
@@ -710,15 +759,40 @@
                 {/* Category */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Category</label>
-                  <select
-                    value={newRef.category}
-                    onChange={e => setNewRef(p => ({ ...p, category: e.target.value }))}
-                    style={styles.select}
-                  >
-                    {CATEGORIES[newRef.type]?.filter(c => c.id !== 'all').map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
+                  <div style={styles.categoryInputWrapper} ref={categoryInputRef}>
+                    <input
+                      type="text"
+                      value={newRef.category}
+                      onChange={e => { setNewRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
+                      onFocus={() => setShowCategorySuggestions(true)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(newRef.type, newRef.category); } }}
+                      style={styles.input}
+                      placeholder="카테고리 선택 또는 입력"
+                    />
+                    {showCategorySuggestions && allCategories[newRef.type]?.length > 0 && (
+                      <div style={styles.categorySuggestions}>
+                        {allCategories[newRef.type]
+                          .filter(cat => cat.toLowerCase().includes(newRef.category.toLowerCase()))
+                          .map(cat => (
+                            <button 
+                              key={cat} 
+                              style={styles.categorySuggestion} 
+                              onClick={() => { setNewRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        {newRef.category && !allCategories[newRef.type]?.includes(newRef.category) && (
+                          <button 
+                            style={styles.categorySuggestionNew}
+                            onClick={() => handleAddCategory(newRef.type, newRef.category)}
+                          >
+                            + "{newRef.category}" 추가
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Tags */}
@@ -732,7 +806,7 @@
                       </span>
                     ))}
                   </div>
-                  <div style={styles.tagInputWrapper}>
+                  <div style={styles.tagInputWrapper} ref={tagInputRef}>
                     <input
                       type="text"
                       value={tagInput}
@@ -785,6 +859,12 @@
                       ◐ Mobile
                     </button>
                     <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'graphic' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'graphic' }))}
+                    >
+                      ◈ Graphic
+                    </button>
+                    <button
                       style={{ ...styles.typeButton, ...(editRef.type === 'component' ? styles.typeButtonActive : {}) }}
                       onClick={() => setEditRef(p => ({ ...p, type: 'component' }))}
                     >
@@ -807,7 +887,7 @@
                           onChange={e => handleImageNoteChange(img.id, e.target.value, true)}
                           style={styles.imgNoteInput}
                         />
-                        {(editRef.type === 'web' || editRef.type === 'mobile') && (
+                        {editRef.type !== 'component' && (
                           <label style={styles.componentCheckbox}>
                             <input
                               type="checkbox"
@@ -819,13 +899,13 @@
                         )}
                       </div>
                     ))}
-                    {(editRef.type === 'web' || editRef.type === 'mobile' || editRef.images.length === 0) && (
+                    {(editRef.type !== 'component' || editRef.images.length === 0) && (
                       <label style={styles.addImageBtn}>
                         + Add Image
                         <input
                           type="file"
                           accept="image/*"
-                          multiple={editRef.type === 'web' || editRef.type === 'mobile'}
+                          multiple={editRef.type !== 'component'}
                           onChange={e => handleImageUpload(e, true)}
                           style={{ display: 'none' }}
                         />
@@ -859,15 +939,31 @@
                 {/* Category */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Category</label>
-                  <select
-                    value={editRef.category}
-                    onChange={e => setEditRef(p => ({ ...p, category: e.target.value }))}
-                    style={styles.select}
-                  >
-                    {CATEGORIES[editRef.type]?.filter(c => c.id !== 'all').map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
+                  <div style={styles.categoryInputWrapper}>
+                    <input
+                      type="text"
+                      value={editRef.category}
+                      onChange={e => { setEditRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
+                      onFocus={() => setShowCategorySuggestions(true)}
+                      style={styles.input}
+                      placeholder="카테고리 선택 또는 입력"
+                    />
+                    {showCategorySuggestions && allCategories[editRef.type]?.length > 0 && (
+                      <div style={styles.categorySuggestions}>
+                        {allCategories[editRef.type]
+                          .filter(cat => cat.toLowerCase().includes((editRef.category || '').toLowerCase()))
+                          .map(cat => (
+                            <button 
+                              key={cat} 
+                              style={styles.categorySuggestion} 
+                              onClick={() => { setEditRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Tags */}
@@ -987,21 +1083,29 @@
       imgNoteInput: { width: '100%', marginTop: '8px', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', fontFamily: '"Outfit", sans-serif', resize: 'vertical', minHeight: '60px' },
       addImageBtn: { width: '180px', height: '120px', border: '2px dashed #d1d5db', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', fontFamily: '"Outfit", sans-serif', transition: 'border-color 0.2s' },
       tagsContainer: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' },
-      tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f0ff', color: '#6366f1', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
-      tagRemove: { background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '16px', padding: 0 },
+      tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#dbeafe', color: '#1d4ed8', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
+      tagRemove: { background: 'none', border: 'none', color: '#1d4ed8', cursor: 'pointer', fontSize: '16px', padding: 0 },
       tagInputWrapper: { position: 'relative' },
       tagSuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
       tagSuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      categoryInputWrapper: { position: 'relative' },
+      categorySuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
+      categorySuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      categorySuggestionNew: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: '#f0fdf4', color: '#16a34a', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', fontWeight: '500' },
       componentCheckbox: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '12px', color: '#6366f1', cursor: 'pointer' },
       submitBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', fontFamily: '"Outfit", sans-serif' },
       editBtns: { display: 'flex', gap: '12px' },
       cancelBtn: { flex: 1, padding: '14px', background: '#f0f0f5', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
-      tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
-      tagFilterLabel: { fontSize: '14px', color: '#666', fontWeight: '500' },
+      categoryFilterSection: { maxWidth: '1400px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+      filterLabel: { fontSize: '13px', color: '#888', fontWeight: '600', minWidth: '70px' },
+      categoryFilter: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      catButton: { padding: '6px 14px', background: '#f5f5f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', color: '#555', transition: 'all 0.2s' },
+      catButtonActive: { background: '#6366f1', color: '#fff' },
+      tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
       tagFilterList: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
-      tagFilterBtn: { padding: '6px 12px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', transition: 'all 0.2s' },
-      tagFilterBtnActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
-      clearTagsBtn: { padding: '6px 12px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      tagFilterBtn: { padding: '5px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#0284c7', transition: 'all 0.2s' },
+      tagFilterBtnActive: { background: '#0284c7', color: '#fff', borderColor: '#0284c7' },
+      clearTagsBtn: { padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif' },
       zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
       zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
     };
