@@ -18,6 +18,7 @@
     body { font-family: 'Outfit', sans-serif; background: linear-gradient(180deg, #FAFBFC 0%, #F5F7FA 50%, #EEF2F7 100%); min-height: 100vh; }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    /* 코드 블록 스크롤바 스타일 */
     pre::-webkit-scrollbar { width: 8px; height: 8px; }
     pre::-webkit-scrollbar-thumb { background: #4b5563; borderRadius: 4px; }
     pre::-webkit-scrollbar-track { background: #1e1e2e; }
@@ -44,7 +45,7 @@
       component: ['Navigation', 'Hero', 'Button', 'Card', 'Form', 'Modal', 'Sidebar', 'Footer'],
     };
 
-    // [New] 이미지 압축 유틸리티 함수
+    // 이미지 압축 함수
     const compressImage = (file) => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -54,7 +55,7 @@
           img.src = event.target.result;
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_SIZE = 1024; // 최대 해상도 제한 (LocalStorage 용량 확보)
+            const MAX_SIZE = 1024;
             let width = img.width;
             let height = img.height;
 
@@ -74,8 +75,6 @@
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            
-            // JPEG 포맷, 품질 0.7로 압축
             resolve(canvas.toDataURL('image/jpeg', 0.7));
           };
           img.onerror = reject;
@@ -84,7 +83,7 @@
       });
     };
 
-    const DEFAULT_REFERENCES = []; // 초기값 비움 (용량 이슈 방지)
+    const DEFAULT_REFERENCES = [];
 
     function App() {
       const [references, setReferences] = useState(() => {
@@ -95,7 +94,6 @@
         return DEFAULT_REFERENCES;
       });
       
-      // ... (기존 State들 유지)
       const [activeType, setActiveType] = useState('all');
       const [activeCategory, setActiveCategory] = useState('all');
       const [searchQuery, setSearchQuery] = useState('');
@@ -133,7 +131,6 @@
         { id: 'black', color: '#1f2937' }, { id: 'white', color: '#f9fafb' },
       ];
 
-      // blur 핸들러 등 기존 로직 유지...
       const handleTagInputBlur = (e) => {
         setTimeout(() => { if (!tagInputRef.current?.contains(document.activeElement)) setShowTagSuggestions(false); }, 150);
       };
@@ -152,7 +149,6 @@
         }
       }, [references]);
 
-      // ... (useMemo 로직 유지)
       const allTags = useMemo(() => {
         const tags = new Set();
         references.forEach(ref => ref.tags?.forEach(tag => tags.add(tag)));
@@ -192,16 +188,14 @@
         });
       }, [references, activeType, activeCategory, searchQuery, selectedTags]);
 
-      // [Modified] 이미지 업로드 (압축 적용)
+      // 이미지 업로드 (압축 적용)
       const handleImageUpload = async (e, isEdit = false) => {
         const files = Array.from(e.target.files || []);
         
         for (const file of files) {
           if (file.type.startsWith('image/')) {
             try {
-              // 압축 실행
               const compressedSrc = await compressImage(file);
-              
               const newImage = {
                 id: Date.now() + Math.random().toString(36).substr(2, 9),
                 src: compressedSrc,
@@ -223,7 +217,6 @@
         }
       };
 
-      // ... (기존 핸들러 유지: handleRemoveImage, handleImageNoteChange, handleAddTag 등)
       const handleRemoveImage = (imgId, isEdit = false) => {
         if (isEdit) {
           setEditRef(prev => ({ ...prev, images: prev.images.filter(img => img.id !== imgId) }));
@@ -324,7 +317,7 @@
         setSelectedRef(null);
       };
 
-      // [Modified] Figma 생성 핸들러 (노트, 태그 전달)
+      // Figma 생성 API 호출 (노트 및 태그 포함)
       const handleGenerateFigma = async (refId, imgId) => {
         const ref = references.find(r => r.id === refId);
         const img = ref?.images.find(i => i.id === imgId);
@@ -355,7 +348,6 @@
               componentName: ref.title,
               imageWidth: imgEl.naturalWidth,
               imageHeight: imgEl.naturalHeight,
-              // [New] AI에게 컨텍스트 전달
               context: img.note || ref.title, 
               tags: ref.tags || []
             }),
@@ -413,7 +405,7 @@
             </div>
           </header>
 
-          {/* Filters, Grid 등 기존 UI 렌더링 유지... (생략 없음, 위 코드와 동일) */}
+          {/* Filters */}
           <section style={styles.filterSection}>
             <div style={styles.typeToggle}>
               {TYPES.map(type => (
@@ -435,8 +427,57 @@
             />
           </section>
 
-          {/* ... (Category Filter, Tag Filter, Grid Section 유지) ... */}
-          
+          {/* Category Filter */}
+          {activeType !== 'all' && (
+            <div style={styles.categoryFilterSection}>
+              <span style={styles.filterLabel}>Category</span>
+              <div style={styles.categoryFilter}>
+                <button
+                  onClick={() => setActiveCategory('all')}
+                  style={{ ...styles.catButton, ...(activeCategory === 'all' ? styles.catButtonActive : {}) }}
+                >
+                  All
+                </button>
+                {allCategories[activeType]?.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    style={{ ...styles.catButton, ...(activeCategory === cat ? styles.catButtonActive : {}) }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tag Filter */}
+          {allTags.length > 0 && (
+            <div style={styles.tagFilterSection}>
+              <span style={styles.filterLabel}>Tags</span>
+              <div style={styles.tagFilterList}>
+                {allTags.slice(0, 15).map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    style={{ 
+                      ...styles.tagFilterBtn, 
+                      ...(selectedTags.includes(tag) ? styles.tagFilterBtnActive : {}) 
+                    }}
+                  >
+                    {tag}
+                  </button>
+                ))}
+                {selectedTags.length > 0 && (
+                  <button style={styles.clearTagsBtn} onClick={() => setSelectedTags([])}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Grid */}
           <main style={styles.grid}>
             {filteredReferences.map(ref => (
               <article key={ref.id} style={styles.card} onClick={() => { setSelectedRef(ref); setSelectedImageIndex(0); }}>
@@ -510,7 +551,6 @@
                     ))}
                   </div>
 
-                  {/* Figma Section */}
                   <div style={styles.figmaSection}>
                     {selectedRef.images[selectedImageIndex]?.figmaCode ? (
                       <>
@@ -561,29 +601,386 @@
             </div>
           )}
 
-          {/* Add/Edit Modal (기존 UI 로직 유지) */}
-          {(isAddModalOpen || (isEditModalOpen && editRef)) && (
-            <div style={styles.modalOverlay} onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }}>
-               {/* 모달 내부 로직은 위 코드와 동일하게 렌더링... (이미지 업로드 부분은 handleImageUpload 연결 확인) */}
-               <div style={styles.addModal} onClick={e => e.stopPropagation()}>
-                 {/* ... (기존 모달 내용) ... */}
-                 {/* 업로드 input 부분만 확인 */}
-                 {/* <input
-                     type="file"
-                     accept="image/*"
-                     multiple={...}
-                     onChange={e => handleImageUpload(e, isEditModalOpen)} 
-                     style={{ display: 'none' }}
-                   />
-                 */}
-                  <button style={styles.modalClose} onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }}>✕</button>
-                  <h2 style={styles.modalTitle}>{isEditModalOpen ? 'Edit Reference' : 'Add New Reference'}</h2>
-                  {/* ... (나머지 폼 요소들 - 위 코드와 동일하게 구현) ... */}
-                  {/* 간소화를 위해 전체 반복 생략, 핵심 로직은 handleImageUpload와 handleGenerateFigma에 반영됨 */}
-                  <div style={{padding: '20px', textAlign: 'center', color: '#666'}}>
-                    (폼 UI는 기존 코드와 동일하며 handleImageUpload 함수만 교체되었습니다.)
+          {/* Add Modal */}
+          {isAddModalOpen && (
+            <div style={styles.modalOverlay} onClick={() => setIsAddModalOpen(false)}>
+              <div style={styles.addModal} onClick={e => e.stopPropagation()}>
+                <button style={styles.modalClose} onClick={() => setIsAddModalOpen(false)}>✕</button>
+                <h2 style={styles.modalTitle}>Add New Reference</h2>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Type</label>
+                  <div style={styles.typeToggle}>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'web' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'web', category: 'Landing' }))}
+                    >
+                      ◎ Web
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'mobile', category: 'iOS' }))}
+                    >
+                      ◐ Mobile
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'graphic' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'graphic', category: 'Poster' }))}
+                    >
+                      ◈ Graphic
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(newRef.type === 'component' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setNewRef(p => ({ ...p, type: 'component', category: 'Navigation' }))}
+                    >
+                      ◫ Component
+                    </button>
                   </div>
-               </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    Images {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') ? '(여러 장 가능)' : '(1장)'}
+                  </label>
+                  <div style={styles.imageUploadArea}>
+                    {newRef.images.map(img => (
+                      <div key={img.id} style={styles.uploadedImage}>
+                        <img src={img.src} alt="" style={styles.uploadedThumb} />
+                        <button style={styles.removeImgBtn} onClick={() => handleRemoveImage(img.id)}>✕</button>
+                        <textarea
+                          placeholder="이미지 설명..."
+                          value={img.note}
+                          onChange={e => handleImageNoteChange(img.id, e.target.value)}
+                          style={styles.imgNoteInput}
+                        />
+                        {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') && (
+                          <label style={styles.componentCheckbox}>
+                            <input
+                              type="checkbox"
+                              checked={img.isComponent || false}
+                              onChange={() => handleToggleComponent(img.id)}
+                            />
+                            <span>Component로 추가</span>
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                    {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic' || newRef.images.length === 0) && (
+                      <label style={styles.addImageBtn}>
+                        + Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple={newRef.type !== 'component'}
+                          onChange={e => handleImageUpload(e)}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Title *</label>
+                  <input
+                    type="text"
+                    value={newRef.title}
+                    onChange={e => setNewRef(p => ({ ...p, title: e.target.value }))}
+                    style={styles.input}
+                    placeholder="e.g., Linear Homepage"
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>URL</label>
+                  <input
+                    type="url"
+                    value={newRef.url}
+                    onChange={e => setNewRef(p => ({ ...p, url: e.target.value }))}
+                    style={styles.input}
+                    placeholder="https://example.com"
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Category</label>
+                  <div style={styles.categoryInputWrapper} ref={categoryInputRef}>
+                    <input
+                      type="text"
+                      value={newRef.category}
+                      onChange={e => { setNewRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
+                      onFocus={() => setShowCategorySuggestions(true)}
+                      onBlur={handleCategoryInputBlur}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(newRef.type, newRef.category); } }}
+                      style={styles.input}
+                      placeholder="카테고리 선택 또는 입력"
+                    />
+                    {showCategorySuggestions && allCategories[newRef.type]?.length > 0 && (
+                      <div style={styles.categorySuggestions}>
+                        {allCategories[newRef.type]
+                          .filter(cat => cat.toLowerCase().includes(newRef.category.toLowerCase()))
+                          .map(cat => (
+                            <button 
+                              key={cat} 
+                              style={styles.categorySuggestion}
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => { setNewRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        {newRef.category && !allCategories[newRef.type]?.includes(newRef.category) && (
+                          <button 
+                            style={styles.categorySuggestionNew}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => handleAddCategory(newRef.type, newRef.category)}
+                          >
+                            + "{newRef.category}" 추가
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Tags</label>
+                  <div style={styles.tagsContainer}>
+                    {newRef.tags.map(tag => (
+                      <span key={tag} style={styles.tagChip}>
+                        {tag}
+                        <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={styles.tagInputWrapper} ref={tagInputRef}>
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                      onFocus={() => setShowTagSuggestions(true)}
+                      onBlur={handleTagInputBlur}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput); } }}
+                      style={styles.input}
+                      placeholder="태그 입력 후 Enter"
+                    />
+                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                      <div style={styles.tagSuggestions}>
+                        {filteredTagSuggestions.map(tag => (
+                          <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag)}>
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Color</label>
+                  <div style={styles.colorPicker}>
+                    {COLOR_OPTIONS.map(c => (
+                      <button
+                        key={c.id}
+                        style={{
+                          ...styles.colorBtn,
+                          backgroundColor: c.color,
+                          ...(newRef.color === c.id ? styles.colorBtnActive : {})
+                        }}
+                        onClick={() => setNewRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <button style={styles.submitBtn} onClick={handleAddReference}>
+                  Add Reference
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Modal */}
+          {isEditModalOpen && editRef && (
+            <div style={styles.modalOverlay} onClick={() => setIsEditModalOpen(false)}>
+              <div style={styles.addModal} onClick={e => e.stopPropagation()}>
+                <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
+                <h2 style={styles.modalTitle}>Edit Reference</h2>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Type</label>
+                  <div style={styles.typeToggle}>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'web' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'web' }))}
+                    >
+                      ◎ Web
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'mobile' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'mobile' }))}
+                    >
+                      ◐ Mobile
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'graphic' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'graphic' }))}
+                    >
+                      ◈ Graphic
+                    </button>
+                    <button
+                      style={{ ...styles.typeButton, ...(editRef.type === 'component' ? styles.typeButtonActive : {}) }}
+                      onClick={() => setEditRef(p => ({ ...p, type: 'component' }))}
+                    >
+                      ◫ Component
+                    </button>
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Images</label>
+                  <div style={styles.imageUploadArea}>
+                    {editRef.images.map(img => (
+                      <div key={img.id} style={styles.uploadedImage}>
+                        <img src={img.src} alt="" style={styles.uploadedThumb} />
+                        <button style={styles.removeImgBtn} onClick={() => handleRemoveImage(img.id, true)}>✕</button>
+                        <textarea
+                          placeholder="이미지 설명..."
+                          value={img.note}
+                          onChange={e => handleImageNoteChange(img.id, e.target.value, true)}
+                          style={styles.imgNoteInput}
+                        />
+                        {editRef.type !== 'component' && (
+                          <label style={styles.componentCheckbox}>
+                            <input
+                              type="checkbox"
+                              checked={img.isComponent || false}
+                              onChange={() => handleToggleComponent(img.id, true)}
+                            />
+                            <span>Component로 추가</span>
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                    {(editRef.type !== 'component' || editRef.images.length === 0) && (
+                      <label style={styles.addImageBtn}>
+                        + Add Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple={editRef.type !== 'component'}
+                          onChange={e => handleImageUpload(e, true)}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Title *</label>
+                  <input
+                    type="text"
+                    value={editRef.title}
+                    onChange={e => setEditRef(p => ({ ...p, title: e.target.value }))}
+                    style={styles.input}
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>URL</label>
+                  <input
+                    type="url"
+                    value={editRef.url || ''}
+                    onChange={e => setEditRef(p => ({ ...p, url: e.target.value }))}
+                    style={styles.input}
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Category</label>
+                  <div style={styles.categoryInputWrapper}>
+                    <input
+                      type="text"
+                      value={editRef.category}
+                      onChange={e => { setEditRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
+                      onFocus={() => setShowCategorySuggestions(true)}
+                      style={styles.input}
+                      placeholder="카테고리 선택 또는 입력"
+                    />
+                    {showCategorySuggestions && allCategories[editRef.type]?.length > 0 && (
+                      <div style={styles.categorySuggestions}>
+                        {allCategories[editRef.type]
+                          .filter(cat => cat.toLowerCase().includes((editRef.category || '').toLowerCase()))
+                          .map(cat => (
+                            <button 
+                              key={cat} 
+                              style={styles.categorySuggestion} 
+                              onClick={() => { setEditRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Tags</label>
+                  <div style={styles.tagsContainer}>
+                    {editRef.tags?.map(tag => (
+                      <span key={tag} style={styles.tagChip}>
+                        {tag}
+                        <button style={styles.tagRemove} onClick={() => handleRemoveTag(tag, true)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={styles.tagInputWrapper}>
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
+                      onFocus={() => setShowTagSuggestions(true)}
+                      onBlur={handleTagInputBlur}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput, true); } }}
+                      style={styles.input}
+                      placeholder="태그 입력 후 Enter"
+                    />
+                    {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                      <div style={styles.tagSuggestions}>
+                        {filteredTagSuggestions.map(tag => (
+                          <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag, true)}>
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Color</label>
+                  <div style={styles.colorPicker}>
+                    {COLOR_OPTIONS.map(c => (
+                      <button
+                        key={c.id}
+                        style={{
+                          ...styles.colorBtn,
+                          backgroundColor: c.color,
+                          ...(editRef.color === c.id ? styles.colorBtnActive : {})
+                        }}
+                        onClick={() => setEditRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div style={styles.editBtns}>
+                  <button style={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>Cancel</button>
+                  <button style={styles.submitBtn} onClick={handleSaveEdit}>Save Changes</button>
+                </div>
+              </div>
             </div>
           )}
           
@@ -595,10 +992,8 @@
         </div>
       );
     }
-    
-    // Styles (기존 스타일 유지 + 코드 블록 래퍼 추가)
+
     const styles = {
-      // ... (기존 스타일)
       container: { minHeight: '100vh', padding: '20px' },
       header: { maxWidth: '1400px', margin: '0 auto 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
       headerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
@@ -611,7 +1006,16 @@
       typeButton: { padding: '8px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif', fontSize: '14px' },
       typeButtonActive: { background: '#6366f1', color: '#fff', borderColor: '#6366f1' },
       searchInput: { padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', width: '200px', fontFamily: '"Outfit", sans-serif' },
-      
+      categoryFilterSection: { maxWidth: '1400px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+      filterLabel: { fontSize: '13px', color: '#888', fontWeight: '600', minWidth: '70px' },
+      categoryFilter: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      catButton: { padding: '6px 14px', background: '#f5f5f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', color: '#555', transition: 'all 0.2s' },
+      catButtonActive: { background: '#6366f1', color: '#fff' },
+      tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+      tagFilterList: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
+      tagFilterBtn: { padding: '5px 12px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#7c3aed', transition: 'all 0.2s' },
+      tagFilterBtnActive: { background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' },
+      clearTagsBtn: { padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif' },
       grid: { maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
       card: { background: '#fff', borderRadius: '16px', overflow: 'hidden', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', transition: 'transform 0.2s, box-shadow 0.2s' },
       cardImageWrapper: { position: 'relative', aspectRatio: '16/10', overflow: 'hidden' },
@@ -622,7 +1026,6 @@
       cardTitle: { fontSize: '16px', fontWeight: '600', marginBottom: '8px', fontFamily: '"Space Grotesk", sans-serif' },
       cardTags: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
       cardTag: { fontSize: '12px', color: '#6366f1', background: '#f0f0ff', padding: '2px 8px', borderRadius: '4px' },
-      
       modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
       modal: { background: '#fff', borderRadius: '20px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflow: 'auto', position: 'relative' },
       addModal: { background: '#fff', borderRadius: '20px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '30px', position: 'relative' },
@@ -640,7 +1043,6 @@
       modalNote: { color: '#555', fontSize: '15px', lineHeight: 1.6, marginBottom: '16px', padding: '16px', background: '#f9f9f9', borderRadius: '8px', minHeight: '60px' },
       modalTags: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' },
       modalTag: { fontSize: '13px', color: '#6366f1', background: '#f0f0ff', padding: '4px 12px', borderRadius: '6px' },
-      
       figmaSection: { marginBottom: '20px' },
       figmaHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
       copyBtn: { padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', transition: 'all 0.2s' },
@@ -650,16 +1052,10 @@
       generateBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' },
       generateBtnDisabled: { background: '#a5a6f6', cursor: 'not-allowed' },
       spinner: { width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
-      
       modalFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #eee' },
       modalActions: { display: 'flex', gap: '8px' },
       editBtn: { padding: '8px 16px', background: '#f0f0f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
       deleteBtn: { padding: '8px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
-      
-      zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
-      zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
-      
-      // ... 나머지 입력폼 스타일 유지
       formGroup: { marginBottom: '20px' },
       label: { display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#333' },
       input: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
@@ -669,7 +1065,25 @@
       removeImgBtn: { position: 'absolute', top: '-8px', right: '-8px', width: '24px', height: '24px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' },
       imgNoteInput: { width: '100%', marginTop: '8px', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', fontFamily: '"Outfit", sans-serif', resize: 'vertical', minHeight: '60px' },
       addImageBtn: { width: '180px', height: '120px', border: '2px dashed #d1d5db', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', fontFamily: '"Outfit", sans-serif', transition: 'border-color 0.2s' },
+      tagsContainer: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' },
+      tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f0ff', color: '#6366f1', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
+      tagRemove: { background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '16px', padding: 0 },
+      tagInputWrapper: { position: 'relative' },
+      tagSuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
+      tagSuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      categoryInputWrapper: { position: 'relative' },
+      categorySuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
+      categorySuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
+      categorySuggestionNew: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: '#f0fdf4', color: '#16a34a', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', fontWeight: '500' },
+      colorPicker: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      colorBtn: { width: '32px', height: '32px', borderRadius: '50%', border: '2px solid transparent', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' },
+      colorBtnActive: { transform: 'scale(1.15)', boxShadow: '0 0 0 3px rgba(99,102,241,0.4)' },
       componentCheckbox: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '12px', color: '#6366f1', cursor: 'pointer' },
+      submitBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', fontFamily: '"Outfit", sans-serif' },
+      editBtns: { display: 'flex', gap: '12px' },
+      cancelBtn: { flex: 1, padding: '14px', background: '#f0f0f5', border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
+      zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
     };
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
