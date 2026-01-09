@@ -105,28 +105,47 @@
       const tagInputRef = useRef(null);
       const categoryInputRef = useRef(null);
       
-      // 외부 클릭 시 드롭다운 닫기
-      useEffect(() => {
-        const handleClickOutside = (e) => {
-          if (tagInputRef.current && !tagInputRef.current.contains(e.target)) {
+      // 드롭다운 닫기 - blur 이벤트 사용 (모달과 충돌 방지)
+      const handleTagInputBlur = (e) => {
+        // 드롭다운 내부 클릭 시에는 닫지 않음
+        setTimeout(() => {
+          if (!tagInputRef.current?.contains(document.activeElement)) {
             setShowTagSuggestions(false);
           }
-          if (categoryInputRef.current && !categoryInputRef.current.contains(e.target)) {
+        }, 150);
+      };
+      
+      const handleCategoryInputBlur = (e) => {
+        setTimeout(() => {
+          if (!categoryInputRef.current?.contains(document.activeElement)) {
             setShowCategorySuggestions(false);
           }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-      }, []);
+        }, 150);
+      };
       
       const [newRef, setNewRef] = useState({
         type: 'web',
         title: '',
         url: '',
-        images: [], // { id, src, note, figmaCode }
-        category: 'landing',
+        images: [],
+        category: 'Landing',
         tags: [],
+        color: '',
       });
+
+      // 컬러 옵션
+      const COLOR_OPTIONS = [
+        { id: 'red', color: '#ef4444' },
+        { id: 'orange', color: '#f97316' },
+        { id: 'yellow', color: '#eab308' },
+        { id: 'green', color: '#22c55e' },
+        { id: 'blue', color: '#3b82f6' },
+        { id: 'purple', color: '#8b5cf6' },
+        { id: 'pink', color: '#ec4899' },
+        { id: 'gray', color: '#6b7280' },
+        { id: 'black', color: '#1f2937' },
+        { id: 'white', color: '#f9fafb' },
+      ];
 
       // Save to localStorage
       useEffect(() => {
@@ -765,6 +784,7 @@
                       value={newRef.category}
                       onChange={e => { setNewRef(p => ({ ...p, category: e.target.value })); setShowCategorySuggestions(true); }}
                       onFocus={() => setShowCategorySuggestions(true)}
+                      onBlur={handleCategoryInputBlur}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(newRef.type, newRef.category); } }}
                       style={styles.input}
                       placeholder="카테고리 선택 또는 입력"
@@ -776,7 +796,8 @@
                           .map(cat => (
                             <button 
                               key={cat} 
-                              style={styles.categorySuggestion} 
+                              style={styles.categorySuggestion}
+                              onMouseDown={e => e.preventDefault()}
                               onClick={() => { setNewRef(p => ({ ...p, category: cat })); setShowCategorySuggestions(false); }}
                             >
                               {cat}
@@ -785,6 +806,7 @@
                         {newRef.category && !allCategories[newRef.type]?.includes(newRef.category) && (
                           <button 
                             style={styles.categorySuggestionNew}
+                            onMouseDown={e => e.preventDefault()}
                             onClick={() => handleAddCategory(newRef.type, newRef.category)}
                           >
                             + "{newRef.category}" 추가
@@ -812,6 +834,7 @@
                       value={tagInput}
                       onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
                       onFocus={() => setShowTagSuggestions(true)}
+                      onBlur={handleTagInputBlur}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput); } }}
                       style={styles.input}
                       placeholder="태그 입력 후 Enter"
@@ -819,12 +842,30 @@
                     {showTagSuggestions && filteredTagSuggestions.length > 0 && (
                       <div style={styles.tagSuggestions}>
                         {filteredTagSuggestions.map(tag => (
-                          <button key={tag} style={styles.tagSuggestion} onClick={() => handleAddTag(tag)}>
+                          <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag)}>
                             {tag}
                           </button>
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Color */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Color</label>
+                  <div style={styles.colorPicker}>
+                    {COLOR_OPTIONS.map(c => (
+                      <button
+                        key={c.id}
+                        style={{
+                          ...styles.colorBtn,
+                          backgroundColor: c.color,
+                          ...(newRef.color === c.id ? styles.colorBtnActive : {})
+                        }}
+                        onClick={() => setNewRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -983,6 +1024,7 @@
                       value={tagInput}
                       onChange={e => { setTagInput(e.target.value); setShowTagSuggestions(true); }}
                       onFocus={() => setShowTagSuggestions(true)}
+                      onBlur={handleTagInputBlur}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(tagInput, true); } }}
                       style={styles.input}
                       placeholder="태그 입력 후 Enter"
@@ -990,12 +1032,30 @@
                     {showTagSuggestions && filteredTagSuggestions.length > 0 && (
                       <div style={styles.tagSuggestions}>
                         {filteredTagSuggestions.map(tag => (
-                          <button key={tag} style={styles.tagSuggestion} onClick={() => handleAddTag(tag, true)}>
+                          <button key={tag} style={styles.tagSuggestion} onMouseDown={e => e.preventDefault()} onClick={() => handleAddTag(tag, true)}>
                             {tag}
                           </button>
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Color */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Color</label>
+                  <div style={styles.colorPicker}>
+                    {COLOR_OPTIONS.map(c => (
+                      <button
+                        key={c.id}
+                        style={{
+                          ...styles.colorBtn,
+                          backgroundColor: c.color,
+                          ...(editRef.color === c.id ? styles.colorBtnActive : {})
+                        }}
+                        onClick={() => setEditRef(p => ({ ...p, color: p.color === c.id ? '' : c.id }))}
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -1083,8 +1143,8 @@
       imgNoteInput: { width: '100%', marginTop: '8px', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', fontFamily: '"Outfit", sans-serif', resize: 'vertical', minHeight: '60px' },
       addImageBtn: { width: '180px', height: '120px', border: '2px dashed #d1d5db', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', fontFamily: '"Outfit", sans-serif', transition: 'border-color 0.2s' },
       tagsContainer: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' },
-      tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#dbeafe', color: '#1d4ed8', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
-      tagRemove: { background: 'none', border: 'none', color: '#1d4ed8', cursor: 'pointer', fontSize: '16px', padding: 0 },
+      tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f0ff', color: '#6366f1', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
+      tagRemove: { background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '16px', padding: 0 },
       tagInputWrapper: { position: 'relative' },
       tagSuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
       tagSuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
@@ -1092,6 +1152,9 @@
       categorySuggestions: { position: 'absolute', bottom: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 -4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '200px', overflow: 'auto', marginBottom: '4px' },
       categorySuggestion: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif' },
       categorySuggestionNew: { display: 'block', width: '100%', padding: '10px 12px', border: 'none', background: '#f0fdf4', color: '#16a34a', textAlign: 'left', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', fontWeight: '500' },
+      colorPicker: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
+      colorBtn: { width: '32px', height: '32px', borderRadius: '50%', border: '2px solid transparent', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' },
+      colorBtnActive: { transform: 'scale(1.15)', boxShadow: '0 0 0 3px rgba(99,102,241,0.4)' },
       componentCheckbox: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '12px', color: '#6366f1', cursor: 'pointer' },
       submitBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '15px', fontFamily: '"Outfit", sans-serif' },
       editBtns: { display: 'flex', gap: '12px' },
@@ -1103,8 +1166,8 @@
       catButtonActive: { background: '#6366f1', color: '#fff' },
       tagFilterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', padding: '12px 16px', background: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
       tagFilterList: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' },
-      tagFilterBtn: { padding: '5px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#0284c7', transition: 'all 0.2s' },
-      tagFilterBtnActive: { background: '#0284c7', color: '#fff', borderColor: '#0284c7' },
+      tagFilterBtn: { padding: '5px 12px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif', color: '#7c3aed', transition: 'all 0.2s' },
+      tagFilterBtnActive: { background: '#7c3aed', color: '#fff', borderColor: '#7c3aed' },
       clearTagsBtn: { padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontFamily: '"Outfit", sans-serif' },
       zoomOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'zoom-out' },
       zoomImage: { maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' },
