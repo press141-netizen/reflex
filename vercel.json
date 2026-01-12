@@ -3,11 +3,5 @@
     "api/analyze.js": {
       "maxDuration": 60
     }
-  },
-  "rewrites": [
-    {
-      "source": "/b/:boardId",
-      "destination": "/index.html"
-    }
-  ]
+  }
 }
