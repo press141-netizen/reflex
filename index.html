@@ -183,7 +183,6 @@
         } catch (err) {
           console.error('Failed to save categories:', err);
         }
-        }
       };
 
       // 전체 카테고리 (기본 + 커스텀)
@@ -441,7 +440,7 @@
           };
           
           // 서버에 저장
-          const res = await fetch(`/api/boards?`, {
+          const res = await fetch(`/api/boards`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reference }),
@@ -463,7 +462,7 @@
                 tags: [...newRef.tags],
               };
               
-              const compRes = await fetch(`/api/boards?`, {
+              const compRes = await fetch(`/api/boards`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reference: componentRef }),
@@ -504,7 +503,7 @@
           
           const updatedRef = { ...editRef, images: uploadedImages };
           
-          const res = await fetch(`/api/boards?`, {
+          const res = await fetch(`/api/boards`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reference: updatedRef }),
@@ -527,7 +526,7 @@
         if (!confirm('정말 삭제하시겠습니까?')) return;
         
         try {
-          await fetch(`/api/boards?`, {
+          await fetch(`/api/boards`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ referenceId: id }),
@@ -618,7 +617,7 @@
               images: ref.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
             };
             
-            fetch(`/api/boards?`, {
+            fetch(`/api/boards`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ reference: updatedRef }),
