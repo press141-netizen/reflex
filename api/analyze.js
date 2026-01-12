@@ -36,12 +36,12 @@ export default async function handler(req, res) {
     let contextInfo = '';
     if (context) {
       const parts = [];
-      if (context.note) parts.push(`User Description: "${context.note}"`);
+      if (context.note) parts.push(`Description: "${context.note}"`);
       if (context.tags?.length) parts.push(`Tags: ${context.tags.join(', ')}`);
-      if (context.type) parts.push(`UI Type: ${context.type}`);
+      if (context.type) parts.push(`Type: ${context.type}`);
       if (context.category) parts.push(`Category: ${context.category}`);
       if (parts.length) {
-        contextInfo = `\n\nCONTEXT (use this to better understand the UI):\n${parts.join('\n')}`;
+        contextInfo = `\nCONTEXT: ${parts.join(' | ')}`;
       }
     }
 
@@ -59,89 +59,103 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Analyze this UI screenshot and generate Figma Plugin API JavaScript code to recreate it accurately.
+            { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).${contextInfo}
 
-TARGET SIZE: ${width}x${height}px${contextInfo}
+FOCUS ON LAYOUT STRUCTURE:
+1. Identify the GRID/TABLE structure - how many columns, rows
+2. Identify REPEATING PATTERNS - cards, list items, table rows
+3. Extract EXACT spacing, padding, gaps between elements
+4. Note the HIERARCHY: container → sections → items
 
-STRICT RULES:
-1. Return ONLY executable JavaScript - NO markdown backticks, NO explanations
-2. CAREFULLY analyze: colors, layout, typography, spacing, all visible elements
-3. VALID Figma API values ONLY:
-   - primaryAxisSizingMode: "FIXED" or "AUTO" only
-   - counterAxisSizingMode: "FIXED" or "AUTO" only  
-   - layoutAlign: "STRETCH", "CENTER", "MIN", "MAX", "INHERIT"
-   - Use layoutGrow = 1 for elements that should fill space
-4. For dark UI: extract actual dark gray colors (not pure black)
-5. Charts/graphs: colored rectangle placeholders matching visible colors
-6. Icons: small colored rectangles (16-24px)
+CRITICAL RULES:
+- Return ONLY JavaScript code, NO markdown
+- primaryAxisSizingMode/counterAxisSizingMode: ONLY "FIXED" or "AUTO"
+- Use layoutGrow=1 for flexible width elements
+- Charts/graphs = colored rectangle placeholder
+- For repeated rows: use a loop pattern
 
-ANALYZE THE IMAGE FOR:
-- Background colors (main, sidebar, cards)
-- Text colors and sizes
-- Layout structure (sidebar width, header height, grid)
-- All visible text content
-- Button styles, card styles
-- Spacing between elements
-
-COMPLETE CODE TEMPLATE:
+REQUIRED CODE STRUCTURE:
 (async () => {
-  await figma.loadFontAsync({family:"Inter", style:"Regular"});
-  await figma.loadFontAsync({family:"Inter", style:"Medium"});
-  await figma.loadFontAsync({family:"Inter", style:"Semi Bold"});
-  await figma.loadFontAsync({family:"Inter", style:"Bold"});
+  await figma.loadFontAsync({family:"Inter",style:"Regular"});
+  await figma.loadFontAsync({family:"Inter",style:"Medium"});
+  await figma.loadFontAsync({family:"Inter",style:"Semi Bold"});
+  await figma.loadFontAsync({family:"Inter",style:"Bold"});
 
-  const rgb = (r,g,b) => ({r:r/255, g:g/255, b:b/255});
+  const rgb = (r,g,b) => ({r:r/255,g:g/255,b:b/255});
+  const hex = (h) => {const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return{r:r/255,g:g/255,b:b/255};};
   
-  const addText = (parent, str, size, color, style="Regular") => {
-    const t = figma.createText();
-    t.fontName = {family:"Inter", style};
-    t.characters = String(str);
-    t.fontSize = size;
-    t.fills = [{type:"SOLID", color}];
-    parent.appendChild(t);
+  const txt = (p,s,sz,c,st="Regular") => {
+    const t=figma.createText();
+    t.fontName={family:"Inter",style:st};
+    t.characters=String(s);
+    t.fontSize=sz;
+    t.fills=[{type:"SOLID",color:c}];
+    p.appendChild(t);
     return t;
   };
   
-  const addRect = (parent, w, h, color, radius=0) => {
-    const r = figma.createRectangle();
-    r.resize(w, h);
-    r.fills = [{type:"SOLID", color}];
-    if(radius > 0) r.cornerRadius = radius;
-    parent.appendChild(r);
-    return r;
+  const box = (p,w,h,c,r=0) => {
+    const b=figma.createRectangle();
+    b.resize(w,h);
+    b.fills=[{type:"SOLID",color:c}];
+    if(r)b.cornerRadius=r;
+    p.appendChild(b);
+    return b;
   };
   
-  const addFrame = (parent, direction, gap, bgColor=null, padding=0) => {
-    const f = figma.createFrame();
-    f.layoutMode = direction;
-    f.itemSpacing = gap;
-    f.paddingTop = f.paddingBottom = f.paddingLeft = f.paddingRight = padding;
-    f.fills = bgColor ? [{type:"SOLID", color:bgColor}] : [];
-    f.primaryAxisSizingMode = "AUTO";
-    f.counterAxisSizingMode = "AUTO";
-    if(parent) parent.appendChild(f);
+  const row = (p,gap=0,pad=0) => {
+    const f=figma.createFrame();
+    f.layoutMode="HORIZONTAL";
+    f.itemSpacing=gap;
+    f.paddingTop=f.paddingBottom=f.paddingLeft=f.paddingRight=pad;
+    f.primaryAxisSizingMode="AUTO";
+    f.counterAxisSizingMode="AUTO";
+    f.fills=[];
+    if(p)p.appendChild(f);
+    return f;
+  };
+  
+  const col = (p,gap=0,pad=0) => {
+    const f=figma.createFrame();
+    f.layoutMode="VERTICAL";
+    f.itemSpacing=gap;
+    f.paddingTop=f.paddingBottom=f.paddingLeft=f.paddingRight=pad;
+    f.primaryAxisSizingMode="AUTO";
+    f.counterAxisSizingMode="AUTO";
+    f.fills=[];
+    if(p)p.appendChild(f);
     return f;
   };
 
-  // Main container
+  // Main frame
   const main = figma.createFrame();
-  main.name = "${componentName || 'Dashboard'}";
+  main.name = "${componentName || 'Component'}";
   main.resize(${width}, ${height});
-  main.layoutMode = "HORIZONTAL";
+  main.layoutMode = "VERTICAL";
   main.primaryAxisSizingMode = "FIXED";
   main.counterAxisSizingMode = "FIXED";
-  main.clipsContent = true;
-  
-  // TODO: Analyze the image and build the exact UI structure
-  // Set main.fills to the actual background color from the image
-  // Create sidebar, header, content sections as seen in the image
-  // Match all colors, text, and spacing
+  main.fills = [{type:"SOLID",color:rgb(255,255,255)}];
+  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 16;
+  main.itemSpacing = 12;
 
+  // === ANALYZE IMAGE AND BUILD LAYOUT HERE ===
+  // 1. Create container rows/columns matching the layout
+  // 2. For tables: create header row, then data rows
+  // 3. For lists: create item template, repeat
+  // 4. Match colors: backgrounds, text, borders
+  
   figma.currentPage.appendChild(main);
   figma.viewport.scrollAndZoomIntoView([main]);
 })();
 
-Generate complete working code that recreates the UI in the image as accurately as possible. Include ALL visible elements, text, and match the exact colors.` }
+Analyze the image carefully. Focus on:
+- Layout grid structure (columns widths, row heights)
+- Spacing consistency (gaps, padding, margins)
+- Visual hierarchy (headers, content, actions)
+- Color scheme (background, text, accents)
+- Typography (sizes, weights)
+
+Generate complete, working Figma code.` }
           ],
         }],
       }),
@@ -155,19 +169,17 @@ Generate complete working code that recreates the UI in the image as accurately 
     const data = await response.json();
     let code = data.content?.[0]?.text || '';
     
-    // Clean up markdown formatting
+    // Clean markdown
     code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
     
-    // Fix common Figma API errors
-    code = code.replace(/primaryAxisSizingMode\s*=\s*["']FILL_CONTAINER["']/g, 'primaryAxisSizingMode = "AUTO"');
-    code = code.replace(/counterAxisSizingMode\s*=\s*["']FILL_CONTAINER["']/g, 'counterAxisSizingMode = "AUTO"');
-    code = code.replace(/primaryAxisSizingMode\s*=\s*["']FILL["']/g, 'primaryAxisSizingMode = "AUTO"');
-    code = code.replace(/counterAxisSizingMode\s*=\s*["']FILL["']/g, 'counterAxisSizingMode = "AUTO"');
-    code = code.replace(/layoutAlign\s*=\s*["']FILL["']/g, 'layoutAlign = "STRETCH"');
+    // Fix invalid Figma API values
+    code = code.replace(/primaryAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'primaryAxisSizingMode = "AUTO"');
+    code = code.replace(/counterAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'counterAxisSizingMode = "AUTO"');
+    code = code.replace(/layoutAlign\s*=\s*["']FILL["']/gi, 'layoutAlign = "STRETCH"');
     
-    // Ensure code completion
+    // Ensure completion
     if (!code.includes('figma.currentPage.appendChild')) {
-      code += `\n  figma.currentPage.appendChild(main);\n  figma.viewport.scrollAndZoomIntoView([main]);\n})();`;
+      code += '\n  figma.currentPage.appendChild(main);\n  figma.viewport.scrollAndZoomIntoView([main]);\n})();';
     }
 
     return res.status(200).json({ success: true, figmaCode: code });
