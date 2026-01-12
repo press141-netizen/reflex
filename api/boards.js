@@ -11,31 +11,50 @@ export default async function handler(req, res) {
   const KV_TOKEN = process.env.KV_REST_API_TOKEN;
 
   if (!KV_URL || !KV_TOKEN) {
-    return res.status(500).json({ error: 'KV not configured' });
+    return res.status(500).json({ error: 'KV not configured', details: { hasUrl: !!KV_URL, hasToken: !!KV_TOKEN } });
   }
 
-  // Upstash REST API 호출 함수
+  // Upstash REST API - pipeline 방식
+  const kvCommand = async (command) => {
+    try {
+      const response = await fetch(KV_URL, {
+        method: 'POST',
+        headers: { 
+          Authorization: `Bearer ${KV_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(command),
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('KV Error:', text);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.result;
+    } catch (err) {
+      console.error('KV Request Error:', err);
+      return null;
+    }
+  };
+
   const kvGet = async (key) => {
-    const response = await fetch(`${KV_URL}/get/${key}`, {
-      headers: { Authorization: `Bearer ${KV_TOKEN}` },
-    });
-    const data = await response.json();
-    if (data.result) {
-      return JSON.parse(data.result);
+    const result = await kvCommand(['GET', key]);
+    if (result) {
+      try {
+        return JSON.parse(result);
+      } catch {
+        return null;
+      }
     }
     return null;
   };
 
   const kvSet = async (key, value) => {
-    const response = await fetch(`${KV_URL}/set/${key}`, {
-      method: 'POST',
-      headers: { 
-        Authorization: `Bearer ${KV_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(JSON.stringify(value)),
-    });
-    return response.ok;
+    const result = await kvCommand(['SET', key, JSON.stringify(value)]);
+    return result === 'OK';
   };
 
   try {
@@ -74,7 +93,11 @@ export default async function handler(req, res) {
       };
       
       data.references.unshift(newRef);
-      await kvSet(boardKey, data);
+      const saved = await kvSet(boardKey, data);
+      
+      if (!saved) {
+        return res.status(500).json({ error: 'Failed to save' });
+      }
       
       return res.status(201).json({ success: true, reference: newRef });
     }
@@ -126,6 +149,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Board API Error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message, stack: error.stack });
   }
 }
