@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const height = imageHeight || 600;
     const mime = mimeType || 'image/png';
 
-    // 컨텍스트 정보 구성
+    // 컨텍스트 정보
     let contextInfo = '';
     if (context) {
       const parts = [];
@@ -40,9 +40,7 @@ export default async function handler(req, res) {
       if (context.tags?.length) parts.push(`Tags: ${context.tags.join(', ')}`);
       if (context.type) parts.push(`Type: ${context.type}`);
       if (context.category) parts.push(`Category: ${context.category}`);
-      if (parts.length) {
-        contextInfo = `\nCONTEXT: ${parts.join(' | ')}`;
-      }
+      if (parts.length) contextInfo = `\nCONTEXT: ${parts.join(' | ')}`;
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -61,20 +59,34 @@ export default async function handler(req, res) {
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
             { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).${contextInfo}
 
-FOCUS ON LAYOUT STRUCTURE:
-1. Identify the GRID/TABLE structure - how many columns, rows
-2. Identify REPEATING PATTERNS - cards, list items, table rows
-3. Extract EXACT spacing, padding, gaps between elements
-4. Note the HIERARCHY: container → sections → items
+IMPORTANT - HOW TO HANDLE DIFFERENT UI ELEMENTS:
 
-CRITICAL RULES:
-- Return ONLY JavaScript code, NO markdown
+1. CHARTS/GRAPHS/DATA VISUALIZATIONS:
+   - Create ONE simple colored rectangle as placeholder
+   - Do NOT try to recreate bars, lines, or data points
+   - Just mark the chart area with a light gray box
+   - Example: box(container, 400, 200, rgb(240,240,240), 4);
+
+2. TABLES/LISTS:
+   - Create proper row/column structure
+   - Include actual text content
+   - Match column widths and spacing
+
+3. CARDS/CONTAINERS:
+   - Match background colors
+   - Include proper padding and border radius
+
+4. TEXT:
+   - Include all visible text
+   - Match approximate font sizes
+   - Use correct colors
+
+RULES:
+- Return ONLY JavaScript, NO markdown
 - primaryAxisSizingMode/counterAxisSizingMode: ONLY "FIXED" or "AUTO"
-- Use layoutGrow=1 for flexible width elements
-- Charts/graphs = colored rectangle placeholder
-- For repeated rows: use a loop pattern
+- DO NOT overcomplicate charts - just use a placeholder rectangle
 
-REQUIRED CODE STRUCTURE:
+CODE TEMPLATE:
 (async () => {
   await figma.loadFontAsync({family:"Inter",style:"Regular"});
   await figma.loadFontAsync({family:"Inter",style:"Medium"});
@@ -82,7 +94,6 @@ REQUIRED CODE STRUCTURE:
   await figma.loadFontAsync({family:"Inter",style:"Bold"});
 
   const rgb = (r,g,b) => ({r:r/255,g:g/255,b:b/255});
-  const hex = (h) => {const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return{r:r/255,g:g/255,b:b/255};};
   
   const txt = (p,s,sz,c,st="Regular") => {
     const t=figma.createText();
@@ -111,6 +122,7 @@ REQUIRED CODE STRUCTURE:
     f.primaryAxisSizingMode="AUTO";
     f.counterAxisSizingMode="AUTO";
     f.fills=[];
+    f.counterAxisAlignItems="CENTER";
     if(p)p.appendChild(f);
     return f;
   };
@@ -135,27 +147,21 @@ REQUIRED CODE STRUCTURE:
   main.primaryAxisSizingMode = "FIXED";
   main.counterAxisSizingMode = "FIXED";
   main.fills = [{type:"SOLID",color:rgb(255,255,255)}];
-  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 16;
-  main.itemSpacing = 12;
+  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 20;
+  main.itemSpacing = 16;
 
-  // === ANALYZE IMAGE AND BUILD LAYOUT HERE ===
-  // 1. Create container rows/columns matching the layout
-  // 2. For tables: create header row, then data rows
-  // 3. For lists: create item template, repeat
-  // 4. Match colors: backgrounds, text, borders
+  // BUILD LAYOUT HERE
+  // For charts: just use box(parent, width, height, rgb(245,245,245), 8) as placeholder
+  // Focus on overall structure, headers, text labels, legends
   
   figma.currentPage.appendChild(main);
   figma.viewport.scrollAndZoomIntoView([main]);
 })();
 
-Analyze the image carefully. Focus on:
-- Layout grid structure (columns widths, row heights)
-- Spacing consistency (gaps, padding, margins)
-- Visual hierarchy (headers, content, actions)
-- Color scheme (background, text, accents)
-- Typography (sizes, weights)
-
-Generate complete, working Figma code.` }
+Generate the code. Remember:
+- Charts = simple gray rectangle placeholder (DO NOT recreate data visualization)
+- Focus on layout structure, spacing, colors
+- Include all text labels and headers` }
           ],
         }],
       }),
@@ -172,7 +178,7 @@ Generate complete, working Figma code.` }
     // Clean markdown
     code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
     
-    // Fix invalid Figma API values
+    // Fix invalid values
     code = code.replace(/primaryAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'primaryAxisSizingMode = "AUTO"');
     code = code.replace(/counterAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'counterAxisSizingMode = "AUTO"');
     code = code.replace(/layoutAlign\s*=\s*["']FILL["']/gi, 'layoutAlign = "STRETCH"');
