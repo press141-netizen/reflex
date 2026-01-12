@@ -620,6 +620,18 @@
                 images: prev.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
               }));
             }
+            
+            // 서버에도 저장
+            const updatedRef = {
+              ...ref,
+              images: ref.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
+            };
+            
+            fetch(`/api/boards?boardId=${boardId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reference: updatedRef }),
+            }).catch(err => console.error('Failed to save figma code:', err));
           }
         } catch (error) {
           console.error('Figma 생성 실패:', error);
