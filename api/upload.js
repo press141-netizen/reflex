@@ -1,5 +1,3 @@
-import { put } from '@vercel/blob';
-
 export const config = {
   api: {
     bodyParser: {
@@ -21,8 +19,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
+
+  if (!BLOB_TOKEN) {
+    return res.status(500).json({ error: 'Blob storage not configured' });
+  }
+
   try {
-    const { image, filename, contentType } = req.body;
+    const { image, contentType } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image data required' });
@@ -34,18 +38,31 @@ export default async function handler(req, res) {
 
     // 파일명 생성
     const ext = contentType?.split('/')[1] || 'png';
-    const name = filename || `image-${Date.now()}.${ext}`;
+    const filename = `reflex-${Date.now()}.${ext}`;
 
-    // Vercel Blob에 업로드
-    const blob = await put(name, buffer, {
-      access: 'public',
-      contentType: contentType || 'image/png',
+    // Vercel Blob API 직접 호출
+    const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${BLOB_TOKEN}`,
+        'Content-Type': contentType || 'image/png',
+        'x-api-version': '7',
+      },
+      body: buffer,
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Blob upload error:', errorText);
+      return res.status(500).json({ error: 'Upload failed', details: errorText });
+    }
+
+    const blob = await response.json();
 
     return res.status(200).json({ 
       success: true, 
       url: blob.url,
-      filename: name,
+      filename: filename,
     });
 
   } catch (error) {
