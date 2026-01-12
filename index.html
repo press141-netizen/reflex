@@ -196,18 +196,17 @@
         });
       }, [references, activeType, activeCategory, searchQuery, selectedTags]);
 
-      // 이미지 업로드 핸들러 (원본 품질 유지)
-      const handleImageUpload = async (e, isEdit = false) => {
-        const files = Array.from(e.target.files || []);
+      // 이미지 처리 함수 (파일 배열 받음)
+      const processImageFiles = (files, isEdit = false) => {
         for (const file of files) {
-          if (file.type.startsWith('image/')) {
+          if (file.type?.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = (ev) => {
               const img = new Image();
               img.onload = () => {
                 const newImage = {
                   id: Date.now() + Math.random().toString(36).substr(2, 9),
-                  src: ev.target.result, // 원본 이미지 그대로 저장
+                  src: ev.target.result,
                   note: '',
                   figmaCode: null,
                   isComponent: false,
@@ -223,6 +222,53 @@
               img.src = ev.target.result;
             };
             reader.readAsDataURL(file);
+          }
+        }
+      };
+
+      // 이미지 업로드 핸들러 (input file)
+      const handleImageUpload = (e, isEdit = false) => {
+        const files = Array.from(e.target.files || []);
+        processImageFiles(files, isEdit);
+      };
+
+      // 드래그앤드롭 상태
+      const [isDragging, setIsDragging] = useState(false);
+      
+      const handleDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+      };
+      
+      const handleDragLeave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+      };
+      
+      const handleDrop = (e, isEdit = false) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 0) {
+          processImageFiles(files, isEdit);
+        }
+      };
+
+      // 클립보드 붙여넣기 핸들러
+      const handlePaste = (e, isEdit = false) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (file) {
+              processImageFiles([file], isEdit);
+            }
           }
         }
       };
@@ -593,9 +639,9 @@
           {selectedRef && (
             <div 
               style={styles.modalOverlay} 
-              onMouseDown={e => { if (e.target === e.currentTarget) setSelectedRef(null); }}
+              onClick={e => { if (e.target === e.currentTarget) setSelectedRef(null); }}
             >
-              <div style={styles.modal} onMouseDown={e => e.stopPropagation()}>
+              <div style={styles.modal} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
                 
                 {/* 이미지 갤러리 */}
@@ -697,9 +743,9 @@
           {isAddModalOpen && (
             <div 
               style={styles.modalOverlay} 
-              onMouseDown={e => { if (e.target === e.currentTarget) setIsAddModalOpen(false); }}
+              onClick={e => { if (e.target === e.currentTarget) setIsAddModalOpen(false); }}
             >
-              <div style={styles.addModal} onMouseDown={e => e.stopPropagation()}>
+              <div style={styles.addModal} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setIsAddModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Add New Reference</h2>
 
@@ -737,9 +783,20 @@
                 {/* Images */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
-                    Images {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') ? '(여러 장 가능)' : '(1장)'}
+                    Images {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic') ? '(여러 장 가능)' : '(1장)'} 
+                    <span style={styles.labelHint}> - 드래그, 붙여넣기(Ctrl+V) 가능</span>
                   </label>
-                  <div style={styles.imageUploadArea}>
+                  <div 
+                    style={{
+                      ...styles.imageUploadArea,
+                      ...(isDragging ? styles.imageUploadAreaDragging : {})
+                    }}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={e => handleDrop(e, false)}
+                    onPaste={e => handlePaste(e, false)}
+                    tabIndex={0}
+                  >
                     {newRef.images.map(img => (
                       <div key={img.id} style={styles.uploadedImage}>
                         <img src={img.src} alt="" style={styles.uploadedThumb} />
@@ -763,8 +820,8 @@
                       </div>
                     ))}
                     {(newRef.type === 'web' || newRef.type === 'mobile' || newRef.type === 'graphic' || newRef.images.length === 0) && (
-                      <label style={styles.addImageBtn}>
-                        + Add Image
+                      <label style={{...styles.addImageBtn, ...(isDragging ? styles.addImageBtnDragging : {})}}>
+                        {isDragging ? '여기에 놓으세요' : '+ Add Image'}
                         <input
                           type="file"
                           accept="image/*"
@@ -924,9 +981,9 @@
           {isEditModalOpen && editRef && (
             <div 
               style={styles.modalOverlay} 
-              onMouseDown={e => { if (e.target === e.currentTarget) setIsEditModalOpen(false); }}
+              onClick={e => { if (e.target === e.currentTarget) setIsEditModalOpen(false); }}
             >
-              <div style={styles.addModal} onMouseDown={e => e.stopPropagation()}>
+              <div style={styles.addModal} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
                 <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Edit Reference</h2>
 
@@ -963,8 +1020,21 @@
 
                 {/* Images */}
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Images</label>
-                  <div style={styles.imageUploadArea}>
+                  <label style={styles.label}>
+                    Images
+                    <span style={styles.labelHint}> - 드래그, 붙여넣기(Ctrl+V) 가능</span>
+                  </label>
+                  <div 
+                    style={{
+                      ...styles.imageUploadArea,
+                      ...(isDragging ? styles.imageUploadAreaDragging : {})
+                    }}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={e => handleDrop(e, true)}
+                    onPaste={e => handlePaste(e, true)}
+                    tabIndex={0}
+                  >
                     {editRef.images.map(img => (
                       <div key={img.id} style={styles.uploadedImage}>
                         <img src={img.src} alt="" style={styles.uploadedThumb} />
@@ -988,8 +1058,8 @@
                       </div>
                     ))}
                     {(editRef.type !== 'component' || editRef.images.length === 0) && (
-                      <label style={styles.addImageBtn}>
-                        + Add Image
+                      <label style={{...styles.addImageBtn, ...(isDragging ? styles.addImageBtnDragging : {})}}>
+                        {isDragging ? '여기에 놓으세요' : '+ Add Image'}
                         <input
                           type="file"
                           accept="image/*"
@@ -1203,14 +1273,17 @@
       deleteBtn: { padding: '8px 16px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
       formGroup: { marginBottom: '20px' },
       label: { display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#333' },
+      labelHint: { fontSize: '12px', fontWeight: '400', color: '#999' },
       input: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
       select: { width: '100%', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', fontFamily: '"Outfit", sans-serif' },
-      imageUploadArea: { display: 'flex', flexWrap: 'wrap', gap: '16px' },
+      imageUploadArea: { display: 'flex', flexWrap: 'wrap', gap: '16px', padding: '16px', border: '2px dashed transparent', borderRadius: '12px', transition: 'all 0.2s', outline: 'none', minHeight: '160px' },
+      imageUploadAreaDragging: { borderColor: '#6366f1', background: '#f0f0ff' },
       uploadedImage: { position: 'relative', width: '180px' },
       uploadedThumb: { width: '180px', height: '120px', objectFit: 'cover', borderRadius: '8px' },
       removeImgBtn: { position: 'absolute', top: '-8px', right: '-8px', width: '24px', height: '24px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' },
       imgNoteInput: { width: '100%', marginTop: '8px', padding: '10px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '13px', fontFamily: '"Outfit", sans-serif', resize: 'vertical', minHeight: '60px' },
-      addImageBtn: { width: '180px', height: '120px', border: '2px dashed #d1d5db', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', fontFamily: '"Outfit", sans-serif', transition: 'border-color 0.2s' },
+      addImageBtn: { width: '180px', height: '120px', border: '2px dashed #d1d5db', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', fontFamily: '"Outfit", sans-serif', transition: 'all 0.2s', flexDirection: 'column', gap: '8px' },
+      addImageBtnDragging: { borderColor: '#6366f1', color: '#6366f1', background: '#f0f0ff' },
       tagsContainer: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' },
       tagChip: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f0ff', color: '#6366f1', padding: '4px 10px', borderRadius: '6px', fontSize: '13px' },
       tagRemove: { background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '16px', padding: 0 },
