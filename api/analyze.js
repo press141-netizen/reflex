@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { image, componentName, mimeType, imageWidth, imageHeight } = req.body;
+    const { image, componentName, mimeType, imageWidth, imageHeight, context } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image is required' });
@@ -28,9 +28,19 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'API key not configured' });
     }
 
-    const width = imageWidth || 400;
-    const height = imageHeight || 300;
+    const width = imageWidth || 800;
+    const height = imageHeight || 600;
     const mime = mimeType || 'image/png';
+
+    let contextInfo = '';
+    if (context) {
+      const parts = [];
+      if (context.note) parts.push(`Description: "${context.note}"`);
+      if (context.tags?.length) parts.push(`Tags: ${context.tags.join(', ')}`);
+      if (context.type) parts.push(`Type: ${context.type}`);
+      if (context.category) parts.push(`Category: ${context.category}`);
+      if (parts.length) contextInfo = `\nCONTEXT: ${parts.join(' | ')}`;
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -41,100 +51,120 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
+        max_tokens: 8000,
         messages: [{
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Generate Figma Plugin API code to recreate this UI. Size: ${width}x${height}px.
+            { type: 'text', text: `Convert this UI to Figma Plugin API code (${width}x${height}px).${contextInfo}
 
-Return ONLY JavaScript code (no markdown, no explanation):
+CRITICAL RULES:
+1. Return ONLY executable JavaScript code - no explanations, no markdown, no comments about steps
+2. Copy ALL visible text EXACTLY as shown (Korean text 한글 정확히)
+3. Match the layout structure precisely
 
+CODE TEMPLATE (start your response with this exact code):
 (async () => {
-  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-  await figma.loadFontAsync({ family: "Inter", style: "Medium" });
-  await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
+  await figma.loadFontAsync({family:"Inter",style:"Regular"});
+  await figma.loadFontAsync({family:"Inter",style:"Medium"});
+  await figma.loadFontAsync({family:"Inter",style:"Semi Bold"});
+  await figma.loadFontAsync({family:"Inter",style:"Bold"});
+
+  const rgb = (r,g,b) => ({r:r/255,g:g/255,b:b/255});
+  const hex = (h) => {const v=h.replace('#','');return rgb(parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16));};
   
-  const frame = figma.createFrame();
-  frame.name = "${componentName || 'GeneratedComponent'}";
-  frame.resize(${width}, ${height});
-  frame.fills = [{ type: 'SOLID', color: { r: 0.97, g: 0.97, b: 0.98 } }];
-  frame.cornerRadius = 16;
-  frame.layoutMode = "VERTICAL";
-  frame.paddingTop = frame.paddingBottom = frame.paddingLeft = frame.paddingRight = 16;
-  frame.itemSpacing = 8;
-  frame.primaryAxisSizingMode = "AUTO";
-  frame.counterAxisSizingMode = "AUTO";
+  const txt = (p,s,sz,c,st="Regular") => {
+    const t=figma.createText();
+    t.fontName={family:"Inter",style:st};
+    t.characters=String(s);
+    t.fontSize=sz;
+    t.fills=[{type:"SOLID",color:c}];
+    p.appendChild(t);
+    return t;
+  };
   
-  // Build UI here...
+  const box = (p,w,h,c,r=0) => {
+    const b=figma.createRectangle();
+    b.resize(w,h);
+    b.fills=[{type:"SOLID",color:c}];
+    if(r)b.cornerRadius=r;
+    p.appendChild(b);
+    return b;
+  };
   
-  figma.currentPage.appendChild(frame);
-  figma.viewport.scrollAndZoomIntoView([frame]);
+  const frame = (p,dir,gap=0,px=0,py=0) => {
+    const f=figma.createFrame();
+    f.layoutMode=dir;
+    f.itemSpacing=gap;
+    f.paddingLeft=f.paddingRight=px;
+    f.paddingTop=f.paddingBottom=py;
+    f.primaryAxisSizingMode="AUTO";
+    f.counterAxisSizingMode="AUTO";
+    f.fills=[];
+    if(p)p.appendChild(f);
+    return f;
+  };
+  
+  const row = (p,gap=0) => frame(p,"HORIZONTAL",gap);
+  const col = (p,gap=0) => frame(p,"VERTICAL",gap);
+
+  const main = figma.createFrame();
+  main.name = "${componentName || 'Component'}";
+  main.resize(${width}, ${height});
+  main.layoutMode = "VERTICAL";
+  main.primaryAxisSizingMode = "FIXED";
+  main.counterAxisSizingMode = "FIXED";
+  main.fills = [{type:"SOLID",color:rgb(255,255,255)}];
+  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 20;
+  main.itemSpacing = 16;
+
+  // BUILD UI HERE - use exact text from image
+  
+  figma.currentPage.appendChild(main);
+  figma.viewport.scrollAndZoomIntoView([main]);
 })();
 
-ELEMENT PATTERNS TO USE:
-
-// Menu item row (icon + text)
-const menuItem = figma.createFrame();
-menuItem.name = "MenuItem";
-menuItem.layoutMode = "HORIZONTAL";
-menuItem.counterAxisAlignItems = "CENTER";
-menuItem.itemSpacing = 12;
-menuItem.paddingTop = menuItem.paddingBottom = 12;
-menuItem.paddingLeft = menuItem.paddingRight = 16;
-menuItem.fills = [];
-menuItem.primaryAxisSizingMode = "AUTO";
-menuItem.counterAxisSizingMode = "AUTO";
-
-// Active/selected menu item (with colored background)
-menuItem.fills = [{ type: 'SOLID', color: { r: 0.93, g: 0.95, b: 1 } }];
-menuItem.cornerRadius = 8;
-
-// Icon placeholder (square with rounded corners)
-const icon = figma.createRectangle();
-icon.name = "Icon";
-icon.resize(20, 20);
-icon.cornerRadius = 4;
-icon.fills = [{ type: 'SOLID', color: { r: 0.4, g: 0.4, b: 0.9 } }];
-
-// Text label
-const label = figma.createText();
-label.fontName = { family: "Inter", style: "Medium" };
-label.characters = "Menu Item";
-label.fontSize = 14;
-label.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.25 } }];
-
-// Logo (larger rounded rectangle)
-const logo = figma.createRectangle();
-logo.name = "Logo";
-logo.resize(48, 48);
-logo.cornerRadius = 12;
-logo.fills = [{ type: 'SOLID', color: { r: 0.35, g: 0.4, b: 0.95 } }];
-
-// Card container (white background)
-const card = figma.createFrame();
-card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-card.cornerRadius = 12;
-card.effects = [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.08 }, offset: { x: 0, y: 2 }, radius: 8, visible: true, blendMode: 'NORMAL' }];
-
-RULES:
-- Use "FIXED" or "AUTO" for sizing (NEVER "FILL_CONTAINER")
-- Set fontName BEFORE setting characters
-- Match colors from image (backgrounds, text, icons)
-- Create icon placeholders as rectangles with cornerRadius
-- Use layoutMode for all containers` }
+OUTPUT: Return ONLY the complete JavaScript code. No explanations. No step descriptions. Just code.` }
           ],
         }],
       }),
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: 'API failed' });
+      const errorData = await response.json().catch(() => ({}));
+      return res.status(response.status).json({ error: 'API failed', details: errorData });
     }
 
     const data = await response.json();
     let code = data.content?.[0]?.text || '';
+    
+    // Clean markdown
     code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
+    
+    // Remove any text before (async
+    const asyncIndex = code.indexOf('(async');
+    if (asyncIndex > 0) {
+      code = code.substring(asyncIndex);
+    }
+    
+    // Remove any text after the closing })();
+    const endMatch = code.match(/\}\)\(\);?\s*$/);
+    if (endMatch) {
+      const endIndex = code.lastIndexOf('})();');
+      if (endIndex !== -1) {
+        code = code.substring(0, endIndex + 5);
+      }
+    }
+    
+    // Fix invalid Figma API values
+    code = code.replace(/primaryAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'primaryAxisSizingMode = "AUTO"');
+    code = code.replace(/counterAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'counterAxisSizingMode = "AUTO"');
+    code = code.replace(/layoutAlign\s*=\s*["']FILL["']/gi, 'layoutAlign = "STRETCH"');
+    
+    // Ensure code completion
+    if (!code.includes('figma.currentPage.appendChild')) {
+      code += '\n  figma.currentPage.appendChild(main);\n  figma.viewport.scrollAndZoomIntoView([main]);\n})();';
+    }
 
     return res.status(200).json({ success: true, figmaCode: code });
 
