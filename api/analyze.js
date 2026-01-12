@@ -57,36 +57,28 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Generate Figma Plugin API code for this UI (${width}x${height}px).${contextInfo}
+            { type: 'text', text: `Analyze this UI screenshot and generate Figma Plugin API code (${width}x${height}px).${contextInfo}
 
-IMPORTANT - HOW TO HANDLE DIFFERENT UI ELEMENTS:
+CRITICAL REQUIREMENTS:
+1. **INCLUDE ALL VISIBLE TEXT** - Every text you see MUST be included using txt() function
+2. **READ ALL TEXT CAREFULLY** - Copy the exact text content from the image
+3. Use proper layout structure with row() and col() helpers
+4. Match colors as closely as possible
 
-1. CHARTS/GRAPHS/DATA VISUALIZATIONS:
-   - Create ONE simple colored rectangle as placeholder
-   - Do NOT try to recreate bars, lines, or data points
-   - Just mark the chart area with a light gray box
-   - Example: box(container, 400, 200, rgb(240,240,240), 4);
+ELEMENT HANDLING:
+- Text: ALWAYS include using txt(parent, "exact text here", fontSize, color, style)
+- Input fields: Rectangle with border + placeholder text inside
+- Buttons: Rectangle with text inside
+- Cards: Rectangle container with content inside  
+- Charts/Graphs: Single gray rectangle placeholder (do NOT try to recreate data)
+- Icons: Small colored rectangle (16-24px)
 
-2. TABLES/LISTS:
-   - Create proper row/column structure
-   - Include actual text content
-   - Match column widths and spacing
+VALID FIGMA API VALUES:
+- primaryAxisSizingMode: "FIXED" or "AUTO" only
+- counterAxisSizingMode: "FIXED" or "AUTO" only
+- Use layoutGrow = 1 for flexible elements
 
-3. CARDS/CONTAINERS:
-   - Match background colors
-   - Include proper padding and border radius
-
-4. TEXT:
-   - Include all visible text
-   - Match approximate font sizes
-   - Use correct colors
-
-RULES:
-- Return ONLY JavaScript, NO markdown
-- primaryAxisSizingMode/counterAxisSizingMode: ONLY "FIXED" or "AUTO"
-- DO NOT overcomplicate charts - just use a placeholder rectangle
-
-CODE TEMPLATE:
+CODE STRUCTURE:
 (async () => {
   await figma.loadFontAsync({family:"Inter",style:"Regular"});
   await figma.loadFontAsync({family:"Inter",style:"Medium"});
@@ -146,22 +138,19 @@ CODE TEMPLATE:
   main.layoutMode = "VERTICAL";
   main.primaryAxisSizingMode = "FIXED";
   main.counterAxisSizingMode = "FIXED";
-  main.fills = [{type:"SOLID",color:rgb(255,255,255)}];
-  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 20;
+  main.fills = [{type:"SOLID",color:rgb(250,250,250)}]; // Adjust to match
+  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 24;
   main.itemSpacing = 16;
 
-  // BUILD LAYOUT HERE
-  // For charts: just use box(parent, width, height, rgb(245,245,245), 8) as placeholder
-  // Focus on overall structure, headers, text labels, legends
+  // === BUILD UI HERE ===
+  // Remember: INCLUDE ALL TEXT using txt() function!
+  // Example: txt(main, "Hello World", 24, rgb(0,0,0), "Bold");
   
   figma.currentPage.appendChild(main);
   figma.viewport.scrollAndZoomIntoView([main]);
 })();
 
-Generate the code. Remember:
-- Charts = simple gray rectangle placeholder (DO NOT recreate data visualization)
-- Focus on layout structure, spacing, colors
-- Include all text labels and headers` }
+Now generate the code. IMPORTANT: Include EVERY piece of text visible in the image!` }
           ],
         }],
       }),
