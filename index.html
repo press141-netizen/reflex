@@ -165,7 +165,27 @@
         loadData();
       }, []);
 
-      // 전체 태그 목록
+      // 전체 태그 목록 (현재 타입/카테고리에 해당하는 레퍼런스에서만)
+      const visibleTags = useMemo(() => {
+        const tags = new Set();
+        // 태그 선택 전 필터링 (타입, 카테고리, 검색어만 적용)
+        const baseFiltered = references.filter(ref => {
+          if (activeType !== 'all' && ref.type !== activeType) return false;
+          if (activeCategory !== 'all' && ref.category !== activeCategory) return false;
+          if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            const titleMatch = ref.title.toLowerCase().includes(q);
+            const tagMatch = ref.tags?.some(t => t.toLowerCase().includes(q));
+            const noteMatch = ref.images?.some(img => img.note?.toLowerCase().includes(q));
+            if (!titleMatch && !tagMatch && !noteMatch) return false;
+          }
+          return true;
+        });
+        baseFiltered.forEach(ref => ref.tags?.forEach(tag => tags.add(tag)));
+        return Array.from(tags).sort();
+      }, [references, activeType, activeCategory, searchQuery]);
+
+      // 전체 태그 목록 (태그 입력 자동완성용)
       const allTags = useMemo(() => {
         const tags = new Set();
         references.forEach(ref => ref.tags?.forEach(tag => tags.add(tag)));
@@ -679,7 +699,7 @@
               {TYPES.map(type => (
                 <button
                   key={type.id}
-                  onClick={() => { setActiveType(type.id); setActiveCategory('all'); }}
+                  onClick={() => { setActiveType(type.id); setActiveCategory('all'); setSelectedTags([]); }}
                   style={{ ...styles.typeButton, ...(activeType === type.id ? styles.typeButtonActive : {}) }}
                 >
                   {type.emoji} {type.name}
@@ -707,7 +727,7 @@
               <span style={styles.filterLabel}>Category</span>
               <div style={styles.categoryFilter}>
                 <button
-                  onClick={() => setActiveCategory('all')}
+                  onClick={() => { setActiveCategory('all'); setSelectedTags([]); }}
                   style={{ ...styles.catButton, ...(activeCategory === 'all' ? styles.catButtonActive : {}) }}
                 >
                   All
@@ -715,7 +735,7 @@
                 {allCategories[activeType]?.map(cat => (
                   <button
                     key={cat}
-                    onClick={() => setActiveCategory(cat)}
+                    onClick={() => { setActiveCategory(cat); setSelectedTags([]); }}
                     style={{ ...styles.catButton, ...(activeCategory === cat ? styles.catButtonActive : {}) }}
                   >
                     {cat}
@@ -725,12 +745,12 @@
             </div>
           )}
 
-          {/* Tag Filter */}
-          {allTags.length > 0 && (
+          {/* Tag Filter - 현재 타입/카테고리에 해당하는 태그만 표시 */}
+          {visibleTags.length > 0 && (
             <div style={styles.tagFilterSection}>
               <span style={styles.filterLabel}>Tags</span>
               <div style={styles.tagFilterList}>
-                {allTags.slice(0, 15).map(tag => (
+                {visibleTags.slice(0, 15).map(tag => (
                   <button
                     key={tag}
                     onClick={() => toggleTag(tag)}
