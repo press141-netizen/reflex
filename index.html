@@ -67,25 +67,17 @@
     ];
 
     function App() {
-      const [references, setReferences] = useState(() => {
-        const saved = localStorage.getItem('reflex-references-v2');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            // 구 데이터 마이그레이션
-            return parsed.map(ref => {
-              if (ref.thumbnail && !ref.images) {
-                return {
-                  ...ref,
-                  images: [{ id: 'migrated', src: ref.thumbnail, note: ref.note || '', figmaCode: ref.figmaCode || null }],
-                };
-              }
-              return ref;
-            });
-          } catch { return DEFAULT_REFERENCES; }
-        }
-        return DEFAULT_REFERENCES;
-      });
+      // URL에서 보드 ID 추출 (/b/boardId 형식)
+      const getBoardId = () => {
+        const path = window.location.pathname;
+        const match = path.match(/^\/b\/(.+)$/);
+        return match ? match[1] : 'public';
+      };
+      
+      const [boardId, setBoardId] = useState(getBoardId());
+      const [references, setReferences] = useState([]);
+      const [isLoading, setIsLoading] = useState(true);
+      const [isSaving, setIsSaving] = useState(false);
       
       const [activeType, setActiveType] = useState('all');
       const [activeCategory, setActiveCategory] = useState('all');
@@ -160,10 +152,32 @@
         { id: 'white', color: '#f9fafb' },
       ];
 
-      // Save to localStorage
+      // 서버에서 보드 데이터 로드
       useEffect(() => {
-        localStorage.setItem('reflex-references-v2', JSON.stringify(references));
-      }, [references]);
+        const loadBoard = async () => {
+          setIsLoading(true);
+          try {
+            const res = await fetch(`/api/boards?boardId=${boardId}`);
+            const data = await res.json();
+            setReferences(data.references || []);
+            if (data.customCategories) {
+              setCustomCategories(prev => ({...prev, ...data.customCategories}));
+            }
+          } catch (error) {
+            console.error('Failed to load board:', error);
+            // 폴백: localStorage에서 로드
+            const saved = localStorage.getItem('reflex-references-v2');
+            if (saved) {
+              try {
+                setReferences(JSON.parse(saved));
+              } catch { setReferences([]); }
+            }
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        loadBoard();
+      }, [boardId]);
 
       // 전체 태그 목록
       const allTags = useMemo(() => {
@@ -388,51 +402,151 @@
         }
       };
 
+      // 이미지를 Blob에 업로드하는 함수
+      const uploadImageToBlob = async (base64Image) => {
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64Image,
+              contentType: base64Image.match(/^data:(image\/\w+);/)?.[1] || 'image/png',
+            }),
+          });
+          const data = await res.json();
+          return data.url || base64Image; // 실패시 원본 반환
+        } catch (error) {
+          console.error('Upload failed:', error);
+          return base64Image;
+        }
+      };
+
       // 레퍼런스 추가 (컴포넌트 자동 생성 포함)
-      const handleAddReference = () => {
+      const handleAddReference = async () => {
         if (!newRef.title || newRef.images.length === 0) {
           alert('제목과 최소 1개의 이미지가 필요합니다.');
           return;
         }
         
-        const addedAt = formatDateTime();
-        const reference = {
-          id: Date.now(),
-          ...newRef,
-          addedAt,
-        };
+        setIsSaving(true);
         
-        // 컴포넌트로 체크된 이미지들 자동 추가
-        const componentImages = newRef.images.filter(img => img.isComponent);
-        const componentRefs = componentImages.map((img, idx) => ({
-          id: Date.now() + idx + 1,
-          type: 'component',
-          title: `${newRef.title} - Component`,
-          url: newRef.url,
-          images: [{ ...img, isComponent: false }],
-          category: 'card',
-          tags: [...newRef.tags],
-          addedAt,
-          sourceRefId: reference.id, // 원본 참조
-        }));
-        
-        setReferences(prev => [reference, ...componentRefs, ...prev]);
-        setIsAddModalOpen(false);
-        setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [] });
+        try {
+          // 이미지들을 Blob에 업로드
+          const uploadedImages = await Promise.all(
+            newRef.images.map(async (img) => {
+              if (img.src.startsWith('data:')) {
+                const blobUrl = await uploadImageToBlob(img.src);
+                return { ...img, src: blobUrl };
+              }
+              return img;
+            })
+          );
+          
+          const addedAt = formatDateTime();
+          const reference = {
+            ...newRef,
+            images: uploadedImages,
+            addedAt,
+          };
+          
+          // 서버에 저장
+          const res = await fetch(`/api/boards?boardId=${boardId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference }),
+          });
+          
+          const data = await res.json();
+          if (data.success) {
+            setReferences(prev => [data.reference, ...prev]);
+            
+            // 컴포넌트로 체크된 이미지들 자동 추가
+            const componentImages = uploadedImages.filter(img => img.isComponent);
+            for (let i = 0; i < componentImages.length; i++) {
+              const componentRef = {
+                type: 'component',
+                title: `${newRef.title} - Component`,
+                url: newRef.url,
+                images: [{ ...componentImages[i], isComponent: false }],
+                category: 'card',
+                tags: [...newRef.tags],
+              };
+              
+              const compRes = await fetch(`/api/boards?boardId=${boardId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reference: componentRef }),
+              });
+              const compData = await compRes.json();
+              if (compData.success) {
+                setReferences(prev => [compData.reference, ...prev]);
+              }
+            }
+          }
+          
+          setIsAddModalOpen(false);
+          setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [], colors: [], hexColor: '' });
+        } catch (error) {
+          console.error('Failed to add reference:', error);
+          alert('저장에 실패했습니다.');
+        } finally {
+          setIsSaving(false);
+        }
       };
 
       // 레퍼런스 수정 저장
-      const handleSaveEdit = () => {
+      const handleSaveEdit = async () => {
         if (!editRef.title) return;
-        setReferences(prev => prev.map(ref => ref.id === editRef.id ? editRef : ref));
-        setSelectedRef(editRef);
-        setIsEditModalOpen(false);
+        
+        setIsSaving(true);
+        try {
+          // 새 이미지가 있으면 업로드
+          const uploadedImages = await Promise.all(
+            editRef.images.map(async (img) => {
+              if (img.src.startsWith('data:')) {
+                const blobUrl = await uploadImageToBlob(img.src);
+                return { ...img, src: blobUrl };
+              }
+              return img;
+            })
+          );
+          
+          const updatedRef = { ...editRef, images: uploadedImages };
+          
+          const res = await fetch(`/api/boards?boardId=${boardId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference: updatedRef }),
+          });
+          
+          if (res.ok) {
+            setReferences(prev => prev.map(ref => ref.id === editRef.id ? updatedRef : ref));
+            setSelectedRef(updatedRef);
+          }
+        } catch (error) {
+          console.error('Failed to save:', error);
+        } finally {
+          setIsSaving(false);
+          setIsEditModalOpen(false);
+        }
       };
 
       // 레퍼런스 삭제
-      const handleDeleteReference = (id) => {
-        setReferences(prev => prev.filter(ref => ref.id !== id));
-        setSelectedRef(null);
+      const handleDeleteReference = async (id) => {
+        if (!confirm('정말 삭제하시겠습니까?')) return;
+        
+        try {
+          await fetch(`/api/boards?boardId=${boardId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ referenceId: id }),
+          });
+          
+          setReferences(prev => prev.filter(ref => ref.id !== id));
+          setSelectedRef(null);
+        } catch (error) {
+          console.error('Failed to delete:', error);
+        }
       };
 
       // Figma 코드 생성 (특정 이미지)
@@ -530,6 +644,33 @@
         );
       };
 
+      // 새 보드 생성
+      const createNewBoard = () => {
+        const newBoardId = Math.random().toString(36).substr(2, 8);
+        window.location.href = `/b/${newBoardId}`;
+      };
+
+      // 보드 링크 복사
+      const copyBoardLink = () => {
+        const url = boardId === 'public' 
+          ? window.location.origin 
+          : `${window.location.origin}/b/${boardId}`;
+        navigator.clipboard.writeText(url);
+        alert('보드 링크가 복사되었습니다!');
+      };
+
+      // 로딩 화면
+      if (isLoading) {
+        return (
+          <div style={{...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh'}}>
+            <div style={{textAlign: 'center'}}>
+              <div style={{fontSize: '48px', marginBottom: '16px'}}>◈</div>
+              <div style={{color: '#666'}}>Loading...</div>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div style={styles.container}>
           {/* Header */}
@@ -538,10 +679,26 @@
               <div style={styles.logo}>
                 <span style={styles.logoIcon}>◈</span>
                 <span style={styles.logoText}>Reflex</span>
+                {boardId !== 'public' && (
+                  <span style={styles.boardBadge}>{boardId}</span>
+                )}
               </div>
-              <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)}>
-                + Add Reference
-              </button>
+              <div style={styles.headerActions}>
+                <button style={styles.boardBtn} onClick={copyBoardLink} title="링크 복사">
+                  🔗
+                </button>
+                <button style={styles.boardBtn} onClick={createNewBoard} title="새 보드">
+                  +📋
+                </button>
+                {boardId !== 'public' && (
+                  <button style={styles.boardBtn} onClick={() => window.location.href = '/'} title="공용 보드">
+                    🏠
+                  </button>
+                )}
+                <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)} disabled={isSaving}>
+                  {isSaving ? 'Saving...' : '+ Add Reference'}
+                </button>
+              </div>
             </div>
           </header>
 
@@ -1253,6 +1410,9 @@
       logo: { display: 'flex', alignItems: 'center', gap: '8px' },
       logoIcon: { fontSize: '28px', color: '#6366f1' },
       logoText: { fontSize: '24px', fontWeight: '700', fontFamily: '"Space Grotesk", sans-serif' },
+      boardBadge: { fontSize: '12px', background: '#f0f0ff', color: '#6366f1', padding: '4px 8px', borderRadius: '6px', marginLeft: '8px' },
+      headerActions: { display: 'flex', gap: '8px', alignItems: 'center' },
+      boardBtn: { width: '40px', height: '40px', background: '#f5f5f5', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
       addButton: { padding: '10px 20px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
       filterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' },
       typeToggle: { display: 'flex', gap: '8px' },
