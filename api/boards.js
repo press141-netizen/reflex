@@ -11,144 +11,85 @@ export default async function handler(req, res) {
   const KV_TOKEN = process.env.KV_REST_API_TOKEN;
 
   if (!KV_URL || !KV_TOKEN) {
-    return res.status(500).json({ error: 'KV not configured', details: { hasUrl: !!KV_URL, hasToken: !!KV_TOKEN } });
+    return res.status(500).json({ error: 'Storage not configured' });
   }
 
-  // Upstash REST API - pipeline 방식
-  const kvCommand = async (command) => {
-    try {
-      const response = await fetch(KV_URL, {
-        method: 'POST',
-        headers: { 
-          Authorization: `Bearer ${KV_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(command),
-      });
-      
-      if (!response.ok) {
-        const text = await response.text();
-        console.error('KV Error:', text);
-        return null;
-      }
-      
-      const data = await response.json();
-      return data.result;
-    } catch (err) {
-      console.error('KV Request Error:', err);
-      return null;
-    }
+  // Redis 명령어 실행
+  const redis = async (cmd) => {
+    const r = await fetch(KV_URL, {
+      method: 'POST',
+      headers: { 
+        Authorization: `Bearer ${KV_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(cmd),
+    });
+    const d = await r.json();
+    return d.result;
   };
 
-  const kvGet = async (key) => {
-    const result = await kvCommand(['GET', key]);
-    if (result) {
-      try {
-        return JSON.parse(result);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
-
-  const kvSet = async (key, value) => {
-    const result = await kvCommand(['SET', key, JSON.stringify(value)]);
-    return result === 'OK';
-  };
+  const BOARD_KEY = 'reflex:main';
 
   try {
-    const { boardId = 'public' } = req.query;
-    const boardKey = `board:${boardId}`;
-
-    // GET - 보드 데이터 가져오기
+    // GET - 전체 데이터 로드
     if (req.method === 'GET') {
-      const data = await kvGet(boardKey);
-      return res.status(200).json({
-        boardId,
-        references: data?.references || [],
-        customCategories: data?.customCategories || {},
-        createdAt: data?.createdAt || null,
-      });
+      const raw = await redis(['GET', BOARD_KEY]);
+      if (raw) {
+        const data = JSON.parse(raw);
+        return res.status(200).json(data);
+      }
+      return res.status(200).json({ references: [], customCategories: {} });
     }
 
     // POST - 새 레퍼런스 추가
     if (req.method === 'POST') {
       const { reference } = req.body;
-      
-      if (!reference) {
-        return res.status(400).json({ error: 'Reference data required' });
-      }
+      if (!reference) return res.status(400).json({ error: 'No reference' });
 
-      const data = await kvGet(boardKey) || { 
-        references: [], 
-        customCategories: {},
-        createdAt: new Date().toISOString()
-      };
+      const raw = await redis(['GET', BOARD_KEY]);
+      const data = raw ? JSON.parse(raw) : { references: [], customCategories: {} };
       
-      const newRef = {
-        ...reference,
-        id: Date.now(),
-        addedAt: new Date().toLocaleDateString('ko-KR'),
-      };
-      
+      const newRef = { ...reference, id: Date.now() };
       data.references.unshift(newRef);
-      const saved = await kvSet(boardKey, data);
       
-      if (!saved) {
-        return res.status(500).json({ error: 'Failed to save' });
-      }
-      
+      await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
       return res.status(201).json({ success: true, reference: newRef });
     }
 
     // PUT - 레퍼런스 수정
     if (req.method === 'PUT') {
       const { reference } = req.body;
+      if (!reference?.id) return res.status(400).json({ error: 'No reference ID' });
+
+      const raw = await redis(['GET', BOARD_KEY]);
+      if (!raw) return res.status(404).json({ error: 'Not found' });
       
-      if (!reference || !reference.id) {
-        return res.status(400).json({ error: 'Reference with ID required' });
-      }
-
-      const data = await kvGet(boardKey);
-      if (!data) {
-        return res.status(404).json({ error: 'Board not found' });
-      }
-
-      const index = data.references.findIndex(r => r.id === reference.id);
-      if (index === -1) {
-        return res.status(404).json({ error: 'Reference not found' });
-      }
-
-      data.references[index] = reference;
-      await kvSet(boardKey, data);
+      const data = JSON.parse(raw);
+      const idx = data.references.findIndex(r => r.id === reference.id);
+      if (idx === -1) return res.status(404).json({ error: 'Reference not found' });
       
-      return res.status(200).json({ success: true, reference });
+      data.references[idx] = reference;
+      await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
+      return res.status(200).json({ success: true });
     }
 
     // DELETE - 레퍼런스 삭제
     if (req.method === 'DELETE') {
       const { referenceId } = req.body;
+      if (!referenceId) return res.status(400).json({ error: 'No ID' });
+
+      const raw = await redis(['GET', BOARD_KEY]);
+      if (!raw) return res.status(404).json({ error: 'Not found' });
       
-      if (!referenceId) {
-        return res.status(400).json({ error: 'Reference ID required' });
-      }
-
-      const data = await kvGet(boardKey);
-      if (!data) {
-        return res.status(404).json({ error: 'Board not found' });
-      }
-
+      const data = JSON.parse(raw);
       data.references = data.references.filter(r => r.id !== referenceId);
-      await kvSet(boardKey, data);
-      
+      await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
       return res.status(200).json({ success: true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
-
-  } catch (error) {
-    console.error('Board API Error:', error);
-    return res.status(500).json({ error: error.message, stack: error.stack });
+  } catch (e) {
+    console.error('API Error:', e);
+    return res.status(500).json({ error: e.message });
   }
 }
