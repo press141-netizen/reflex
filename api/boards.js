@@ -1,5 +1,3 @@
-import { createClient } from '@vercel/kv';
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -9,18 +7,44 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  try {
-    const kv = createClient({
-      url: process.env.KV_REST_API_URL,
-      token: process.env.KV_REST_API_TOKEN,
-    });
+  const KV_URL = process.env.KV_REST_API_URL;
+  const KV_TOKEN = process.env.KV_REST_API_TOKEN;
 
+  if (!KV_URL || !KV_TOKEN) {
+    return res.status(500).json({ error: 'KV not configured' });
+  }
+
+  // Upstash REST API 호출 함수
+  const kvGet = async (key) => {
+    const response = await fetch(`${KV_URL}/get/${key}`, {
+      headers: { Authorization: `Bearer ${KV_TOKEN}` },
+    });
+    const data = await response.json();
+    if (data.result) {
+      return JSON.parse(data.result);
+    }
+    return null;
+  };
+
+  const kvSet = async (key, value) => {
+    const response = await fetch(`${KV_URL}/set/${key}`, {
+      method: 'POST',
+      headers: { 
+        Authorization: `Bearer ${KV_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(JSON.stringify(value)),
+    });
+    return response.ok;
+  };
+
+  try {
     const { boardId = 'public' } = req.query;
     const boardKey = `board:${boardId}`;
 
     // GET - 보드 데이터 가져오기
     if (req.method === 'GET') {
-      const data = await kv.get(boardKey);
+      const data = await kvGet(boardKey);
       return res.status(200).json({
         boardId,
         references: data?.references || [],
@@ -37,13 +61,12 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Reference data required' });
       }
 
-      const data = await kv.get(boardKey) || { 
+      const data = await kvGet(boardKey) || { 
         references: [], 
         customCategories: {},
         createdAt: new Date().toISOString()
       };
       
-      // 새 레퍼런스에 ID와 날짜 추가
       const newRef = {
         ...reference,
         id: Date.now(),
@@ -51,7 +74,7 @@ export default async function handler(req, res) {
       };
       
       data.references.unshift(newRef);
-      await kv.set(boardKey, data);
+      await kvSet(boardKey, data);
       
       return res.status(201).json({ success: true, reference: newRef });
     }
@@ -64,7 +87,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Reference with ID required' });
       }
 
-      const data = await kv.get(boardKey);
+      const data = await kvGet(boardKey);
       if (!data) {
         return res.status(404).json({ error: 'Board not found' });
       }
@@ -75,7 +98,7 @@ export default async function handler(req, res) {
       }
 
       data.references[index] = reference;
-      await kv.set(boardKey, data);
+      await kvSet(boardKey, data);
       
       return res.status(200).json({ success: true, reference });
     }
@@ -88,13 +111,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Reference ID required' });
       }
 
-      const data = await kv.get(boardKey);
+      const data = await kvGet(boardKey);
       if (!data) {
         return res.status(404).json({ error: 'Board not found' });
       }
 
       data.references = data.references.filter(r => r.id !== referenceId);
-      await kv.set(boardKey, data);
+      await kvSet(boardKey, data);
       
       return res.status(200).json({ success: true });
     }
