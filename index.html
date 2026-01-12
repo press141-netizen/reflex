@@ -67,15 +67,9 @@
     ];
 
     function App() {
-      // URL에서 보드 ID 추출 (/b/boardId 형식)
-      const getBoardId = () => {
-        const path = window.location.pathname;
-        const match = path.match(/^\/b\/(.+)$/);
-        return match ? match[1] : 'public';
-      };
-      
-      const [boardId, setBoardId] = useState(getBoardId());
+      // 공용 보드만 사용
       const [references, setReferences] = useState([]);
+      const [customCategories, setCustomCategories] = useState({ web: [], mobile: [], graphic: [], component: [] });
       const [isLoading, setIsLoading] = useState(true);
       const [isSaving, setIsSaving] = useState(false);
       
@@ -89,7 +83,7 @@
       const [isEditModalOpen, setIsEditModalOpen] = useState(false);
       const [editRef, setEditRef] = useState(null);
       const [imageZoom, setImageZoom] = useState(null);
-      const [isGenerating, setIsGenerating] = useState(null); // 이미지 ID
+      const [isGenerating, setIsGenerating] = useState(null);
       const [tagInput, setTagInput] = useState('');
       const [showTagSuggestions, setShowTagSuggestions] = useState(false);
       const [categoryInput, setCategoryInput] = useState('');
@@ -152,32 +146,24 @@
         { id: 'white', color: '#f9fafb' },
       ];
 
-      // 서버에서 보드 데이터 로드
+      // 서버에서 데이터 로드 (한 번에 모두)
       useEffect(() => {
-        const loadBoard = async () => {
-          setIsLoading(true);
+        const loadData = async () => {
           try {
-            const res = await fetch(`/api/boards?boardId=${boardId}`);
+            const res = await fetch('/api/boards');
             const data = await res.json();
             setReferences(data.references || []);
             if (data.customCategories) {
-              setCustomCategories(prev => ({...prev, ...data.customCategories}));
+              setCustomCategories(data.customCategories);
             }
           } catch (error) {
-            console.error('Failed to load board:', error);
-            // 폴백: localStorage에서 로드
-            const saved = localStorage.getItem('reflex-references-v2');
-            if (saved) {
-              try {
-                setReferences(JSON.parse(saved));
-              } catch { setReferences([]); }
-            }
+            console.error('Failed to load:', error);
           } finally {
             setIsLoading(false);
           }
         };
-        loadBoard();
-      }, [boardId]);
+        loadData();
+      }, []);
 
       // 전체 태그 목록
       const allTags = useMemo(() => {
@@ -186,16 +172,19 @@
         return Array.from(tags).sort();
       }, [references]);
 
-      // 커스텀 카테고리 (localStorage에서 로드)
-      const [customCategories, setCustomCategories] = useState(() => {
-        const saved = localStorage.getItem('reflex-custom-categories');
-        return saved ? JSON.parse(saved) : { web: [], mobile: [], graphic: [], component: [] };
-      });
-
-      // 커스텀 카테고리 저장
-      useEffect(() => {
-        localStorage.setItem('reflex-custom-categories', JSON.stringify(customCategories));
-      }, [customCategories]);
+      // 커스텀 카테고리 서버에 저장
+      const saveCustomCategories = async (newCategories) => {
+        try {
+          await fetch('/api/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customCategories: newCategories }),
+          });
+        } catch (err) {
+          console.error('Failed to save categories:', err);
+        }
+        }
+      };
 
       // 전체 카테고리 (기본 + 커스텀)
       const allCategories = useMemo(() => {
@@ -361,10 +350,12 @@
         const trimmed = category.trim();
         if (!trimmed) return;
         if (!allCategories[type]?.includes(trimmed)) {
-          setCustomCategories(prev => ({
-            ...prev,
-            [type]: [...(prev[type] || []), trimmed]
-          }));
+          const newCategories = {
+            ...customCategories,
+            [type]: [...(customCategories[type] || []), trimmed]
+          };
+          setCustomCategories(newCategories);
+          saveCustomCategories(newCategories);
         }
         setCategoryInput('');
         setShowCategorySuggestions(false);
@@ -450,7 +441,7 @@
           };
           
           // 서버에 저장
-          const res = await fetch(`/api/boards?boardId=${boardId}`, {
+          const res = await fetch(`/api/boards?`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reference }),
@@ -472,7 +463,7 @@
                 tags: [...newRef.tags],
               };
               
-              const compRes = await fetch(`/api/boards?boardId=${boardId}`, {
+              const compRes = await fetch(`/api/boards?`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reference: componentRef }),
@@ -513,7 +504,7 @@
           
           const updatedRef = { ...editRef, images: uploadedImages };
           
-          const res = await fetch(`/api/boards?boardId=${boardId}`, {
+          const res = await fetch(`/api/boards?`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reference: updatedRef }),
@@ -536,7 +527,7 @@
         if (!confirm('정말 삭제하시겠습니까?')) return;
         
         try {
-          await fetch(`/api/boards?boardId=${boardId}`, {
+          await fetch(`/api/boards?`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ referenceId: id }),
@@ -627,7 +618,7 @@
               images: ref.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
             };
             
-            fetch(`/api/boards?boardId=${boardId}`, {
+            fetch(`/api/boards?`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ reference: updatedRef }),
@@ -656,21 +647,6 @@
         );
       };
 
-      // 새 보드 생성
-      const createNewBoard = () => {
-        const newBoardId = Math.random().toString(36).substr(2, 8);
-        window.location.href = `/b/${newBoardId}`;
-      };
-
-      // 보드 링크 복사
-      const copyBoardLink = () => {
-        const url = boardId === 'public' 
-          ? window.location.origin 
-          : `${window.location.origin}/b/${boardId}`;
-        navigator.clipboard.writeText(url);
-        alert('보드 링크가 복사되었습니다!');
-      };
-
       // 로딩 화면
       if (isLoading) {
         return (
@@ -691,26 +667,10 @@
               <div style={styles.logo}>
                 <span style={styles.logoIcon}>◈</span>
                 <span style={styles.logoText}>Reflex</span>
-                {boardId !== 'public' && (
-                  <span style={styles.boardBadge}>{boardId}</span>
-                )}
               </div>
-              <div style={styles.headerActions}>
-                <button style={styles.boardBtn} onClick={copyBoardLink} title="링크 복사">
-                  🔗
-                </button>
-                <button style={styles.boardBtn} onClick={createNewBoard} title="새 보드">
-                  +📋
-                </button>
-                {boardId !== 'public' && (
-                  <button style={styles.boardBtn} onClick={() => window.location.href = '/'} title="공용 보드">
-                    🏠
-                  </button>
-                )}
-                <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : '+ Add Reference'}
-                </button>
-              </div>
+              <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)} disabled={isSaving}>
+                {isSaving ? 'Saving...' : '+ Add Reference'}
+              </button>
             </div>
           </header>
 
