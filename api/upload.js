@@ -22,7 +22,13 @@ export default async function handler(req, res) {
   const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 
   if (!BLOB_TOKEN) {
-    return res.status(500).json({ error: 'Blob storage not configured' });
+    // Blob이 없으면 원본 base64 그대로 반환 (fallback)
+    const { image } = req.body;
+    return res.status(200).json({ 
+      success: true, 
+      url: image,
+      fallback: true,
+    });
   }
 
   try {
@@ -38,23 +44,30 @@ export default async function handler(req, res) {
 
     // 파일명 생성
     const ext = contentType?.split('/')[1] || 'png';
-    const filename = `reflex-${Date.now()}.${ext}`;
+    const filename = `reflex/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${ext}`;
 
-    // Vercel Blob API 직접 호출
+    // Vercel Blob API 호출
     const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${BLOB_TOKEN}`,
         'Content-Type': contentType || 'image/png',
         'x-api-version': '7',
+        'x-content-type': contentType || 'image/png',
       },
       body: buffer,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Blob upload error:', errorText);
-      return res.status(500).json({ error: 'Upload failed', details: errorText });
+      console.error('Blob upload error:', response.status, errorText);
+      // 실패시 원본 base64 반환
+      return res.status(200).json({ 
+        success: true, 
+        url: image,
+        fallback: true,
+        error: errorText,
+      });
     }
 
     const blob = await response.json();
@@ -62,11 +75,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ 
       success: true, 
       url: blob.url,
-      filename: filename,
     });
 
   } catch (error) {
     console.error('Upload Error:', error);
-    return res.status(500).json({ error: error.message });
+    // 에러시에도 원본 반환
+    const { image } = req.body;
+    return res.status(200).json({ 
+      success: true, 
+      url: image,
+      fallback: true,
+      error: error.message,
+    });
   }
 }
