@@ -32,7 +32,6 @@ export default async function handler(req, res) {
     const height = imageHeight || 600;
     const mime = mimeType || 'image/png';
 
-    // 컨텍스트 정보
     let contextInfo = '';
     if (context) {
       const parts = [];
@@ -57,28 +56,30 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Analyze this UI screenshot and generate Figma Plugin API code (${width}x${height}px).${contextInfo}
+            { type: 'text', text: `You are a UI-to-Figma code converter. Generate precise Figma Plugin API code for this UI (${width}x${height}px).${contextInfo}
 
-CRITICAL REQUIREMENTS:
-1. **INCLUDE ALL VISIBLE TEXT** - Every text you see MUST be included using txt() function
-2. **READ ALL TEXT CAREFULLY** - Copy the exact text content from the image
-3. Use proper layout structure with row() and col() helpers
-4. Match colors as closely as possible
+## STEP 1: TEXT EXTRACTION (CRITICAL!)
+First, carefully read and list ALL visible text in the image:
+- Read each word character by character
+- Korean text must be copied EXACTLY (한글 정확히 복사)
+- Include labels, buttons, tabs, menu items, descriptions
+- Do NOT paraphrase or translate - copy verbatim
 
-ELEMENT HANDLING:
-- Text: ALWAYS include using txt(parent, "exact text here", fontSize, color, style)
-- Input fields: Rectangle with border + placeholder text inside
-- Buttons: Rectangle with text inside
-- Cards: Rectangle container with content inside  
-- Charts/Graphs: Single gray rectangle placeholder (do NOT try to recreate data)
-- Icons: Small colored rectangle (16-24px)
+## STEP 2: LAYOUT ANALYSIS
+Identify the structure:
+- How many columns? (1열, 2열, etc.)
+- What are the rows?
+- Spacing between items
+- Alignment (left, center, right)
 
-VALID FIGMA API VALUES:
-- primaryAxisSizingMode: "FIXED" or "AUTO" only
-- counterAxisSizingMode: "FIXED" or "AUTO" only
-- Use layoutGrow = 1 for flexible elements
+## STEP 3: COMPONENT BREAKDOWN
+For this UI, identify:
+- Header/Title section
+- Tab buttons (if any) - note active/inactive states
+- Content area layout (grid, list, etc.)
+- List items with bullet points or icons
 
-CODE STRUCTURE:
+## CODE TEMPLATE:
 (async () => {
   await figma.loadFontAsync({family:"Inter",style:"Regular"});
   await figma.loadFontAsync({family:"Inter",style:"Medium"});
@@ -86,6 +87,7 @@ CODE STRUCTURE:
   await figma.loadFontAsync({family:"Inter",style:"Bold"});
 
   const rgb = (r,g,b) => ({r:r/255,g:g/255,b:b/255});
+  const hex = (h) => {const v=h.replace('#','');return rgb(parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16));};
   
   const txt = (p,s,sz,c,st="Regular") => {
     const t=figma.createText();
@@ -106,28 +108,41 @@ CODE STRUCTURE:
     return b;
   };
   
-  const row = (p,gap=0,pad=0) => {
+  const frame = (p,dir,gap=0,px=0,py=0) => {
     const f=figma.createFrame();
-    f.layoutMode="HORIZONTAL";
+    f.layoutMode=dir;
     f.itemSpacing=gap;
-    f.paddingTop=f.paddingBottom=f.paddingLeft=f.paddingRight=pad;
+    f.paddingLeft=f.paddingRight=px;
+    f.paddingTop=f.paddingBottom=py;
     f.primaryAxisSizingMode="AUTO";
     f.counterAxisSizingMode="AUTO";
     f.fills=[];
-    f.counterAxisAlignItems="CENTER";
     if(p)p.appendChild(f);
     return f;
   };
   
-  const col = (p,gap=0,pad=0) => {
-    const f=figma.createFrame();
-    f.layoutMode="VERTICAL";
-    f.itemSpacing=gap;
-    f.paddingTop=f.paddingBottom=f.paddingLeft=f.paddingRight=pad;
-    f.primaryAxisSizingMode="AUTO";
-    f.counterAxisSizingMode="AUTO";
-    f.fills=[];
-    if(p)p.appendChild(f);
+  const row = (p,gap=0) => frame(p,"HORIZONTAL",gap);
+  const col = (p,gap=0) => frame(p,"VERTICAL",gap);
+
+  // Bullet point helper
+  const bullet = (p, text, sz=14, c=rgb(102,102,102)) => {
+    const r = row(p, 8);
+    txt(r, "▸", sz, c);
+    txt(r, text, sz, c);
+    return r;
+  };
+
+  // Tab button helper
+  const tab = (p, text, isActive=false, w=60, h=32) => {
+    const f = figma.createFrame();
+    f.resize(w, h);
+    f.layoutMode = "HORIZONTAL";
+    f.primaryAxisAlignItems = "CENTER";
+    f.counterAxisAlignItems = "CENTER";
+    f.fills = isActive ? [{type:"SOLID",color:hex("#3182F6")}] : [{type:"SOLID",color:hex("#F2F4F6")}];
+    f.cornerRadius = 6;
+    txt(f, text, 14, isActive ? rgb(255,255,255) : rgb(102,102,102), "Medium");
+    p.appendChild(f);
     return f;
   };
 
@@ -138,19 +153,27 @@ CODE STRUCTURE:
   main.layoutMode = "VERTICAL";
   main.primaryAxisSizingMode = "FIXED";
   main.counterAxisSizingMode = "FIXED";
-  main.fills = [{type:"SOLID",color:rgb(250,250,250)}]; // Adjust to match
-  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 24;
+  main.fills = [{type:"SOLID",color:rgb(255,255,255)}];
+  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 20;
   main.itemSpacing = 16;
 
-  // === BUILD UI HERE ===
-  // Remember: INCLUDE ALL TEXT using txt() function!
-  // Example: txt(main, "Hello World", 24, rgb(0,0,0), "Bold");
+  // === BUILD THE EXACT UI FROM THE IMAGE ===
+  // Use the extracted text EXACTLY as shown
+  // Match the layout structure precisely
   
   figma.currentPage.appendChild(main);
   figma.viewport.scrollAndZoomIntoView([main]);
 })();
 
-Now generate the code. IMPORTANT: Include EVERY piece of text visible in the image!` }
+## RULES:
+1. TEXT MUST BE EXACT - Copy Korean characters precisely: 잔액조회, 거래내역조회, etc.
+2. Use the bullet() helper for list items with ▸ markers
+3. Use the tab() helper for tab buttons
+4. For 2-column layouts: create a row, then add two col() inside
+5. Match spacing and alignment from the image
+6. NO placeholder text - only use text visible in the image
+
+Generate the complete code now. Remember: EXACT TEXT from the image!` }
           ],
         }],
       }),
@@ -167,12 +190,12 @@ Now generate the code. IMPORTANT: Include EVERY piece of text visible in the ima
     // Clean markdown
     code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
     
-    // Fix invalid values
+    // Fix invalid Figma API values
     code = code.replace(/primaryAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'primaryAxisSizingMode = "AUTO"');
     code = code.replace(/counterAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'counterAxisSizingMode = "AUTO"');
     code = code.replace(/layoutAlign\s*=\s*["']FILL["']/gi, 'layoutAlign = "STRETCH"');
     
-    // Ensure completion
+    // Ensure code completion
     if (!code.includes('figma.currentPage.appendChild')) {
       code += '\n  figma.currentPage.appendChild(main);\n  figma.viewport.scrollAndZoomIntoView([main]);\n})();';
     }
