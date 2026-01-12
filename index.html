@@ -105,6 +105,19 @@
       const tagInputRef = useRef(null);
       const categoryInputRef = useRef(null);
       
+      // 모달 닫기 - mousedown과 mouseup이 같은 overlay에서 발생했을 때만 닫기
+      const mouseDownTarget = useRef(null);
+      const handleOverlayMouseDown = (e) => {
+        mouseDownTarget.current = e.target;
+      };
+      const handleOverlayClick = (e, closeFunc) => {
+        // mousedown과 click이 모두 overlay 자체에서 발생했을 때만 닫기
+        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) {
+          closeFunc();
+        }
+        mouseDownTarget.current = null;
+      };
+      
       // 드롭다운 닫기 - blur 이벤트 사용 (모달과 충돌 방지)
       const handleTagInputBlur = (e) => {
         setTimeout(() => {
@@ -639,9 +652,10 @@
           {selectedRef && (
             <div 
               style={styles.modalOverlay} 
-              onClick={e => { if (e.target === e.currentTarget) setSelectedRef(null); }}
+              onMouseDown={handleOverlayMouseDown}
+              onClick={e => handleOverlayClick(e, () => setSelectedRef(null))}
             >
-              <div style={styles.modal} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+              <div style={styles.modal}>
                 <button style={styles.modalClose} onClick={() => setSelectedRef(null)}>✕</button>
                 
                 {/* 이미지 갤러리 */}
@@ -743,9 +757,10 @@
           {isAddModalOpen && (
             <div 
               style={styles.modalOverlay} 
-              onClick={e => { if (e.target === e.currentTarget) setIsAddModalOpen(false); }}
+              onMouseDown={handleOverlayMouseDown}
+              onClick={e => handleOverlayClick(e, () => setIsAddModalOpen(false))}
             >
-              <div style={styles.addModal} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+              <div style={styles.addModal}>
                 <button style={styles.modalClose} onClick={() => setIsAddModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Add New Reference</h2>
 
@@ -981,9 +996,10 @@
           {isEditModalOpen && editRef && (
             <div 
               style={styles.modalOverlay} 
-              onClick={e => { if (e.target === e.currentTarget) setIsEditModalOpen(false); }}
+              onMouseDown={handleOverlayMouseDown}
+              onClick={e => handleOverlayClick(e, () => setIsEditModalOpen(false))}
             >
-              <div style={styles.addModal} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+              <div style={styles.addModal}>
                 <button style={styles.modalClose} onClick={() => setIsEditModalOpen(false)}>✕</button>
                 <h2 style={styles.modalTitle}>Edit Reference</h2>
 
