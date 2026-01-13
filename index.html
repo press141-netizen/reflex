@@ -899,7 +899,7 @@
                           {isGenerating === selectedRef.images[selectedImageIndex]?.id ? (
                             <><span style={styles.spinner}></span> AI 분석 중...</>
                           ) : (
-                            '🤖 AI로 Figma 코드 생성'
+                            '🤖 AI로 Figma Code 생성'
                           )}
                         </button>
                       )}
@@ -1456,9 +1456,9 @@
       copyBtnSuccess: { background: '#22c55e' },
       figmaCode: { background: '#1e1e2e', color: '#a5d6ff', padding: '16px', borderRadius: '8px', fontSize: '12px', fontFamily: 'monospace', overflow: 'auto', height: '200px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' },
       figmaHint: { marginTop: '8px', fontSize: '12px', color: '#888', fontStyle: 'italic' },
-      generateBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' },
-      generateBtnDisabled: { background: '#a5a6f6', cursor: 'not-allowed' },
-      spinner: { width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
+      generateBtn: { width: '100%', padding: '14px', background: '#fff', color: '#6366f1', border: '2px solid transparent', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif', backgroundImage: 'linear-gradient(#fff, #fff), linear-gradient(135deg, #6366f1, #8b5cf6)', backgroundOrigin: 'border-box', backgroundClip: 'padding-box, border-box' },
+      generateBtnDisabled: { opacity: 0.6, cursor: 'not-allowed' },
+      spinner: { width: '16px', height: '16px', border: '2px solid rgba(99,102,241,0.3)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
       modalFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #eee' },
       modalActions: { display: 'flex', gap: '8px' },
       editBtn: { padding: '8px 16px', background: '#f0f0f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
