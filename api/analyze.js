@@ -57,37 +57,28 @@ export default async function handler(req, res) {
             { type: 'text', text: `Convert this UI screenshot to Figma Plugin API code.
 Image size: ${width}x${height}px${contextInfo}
 
-PRIORITY: LAYOUT ACCURACY IS MOST IMPORTANT!
+CRITICAL RULES:
+1. ALWAYS use Auto Layout (layoutMode) - NEVER use absolute positioning
+2. Every container must have layoutMode = "HORIZONTAL" or "VERTICAL"
+3. Use itemSpacing for gaps between children
+4. Use padding for internal spacing
+5. Match the exact layout structure from the image
 
-LAYOUT ANALYSIS STEPS:
-1. Measure the EXACT position of each element (x, y coordinates)
-2. Measure the EXACT size of each element (width, height)
-3. Identify spacing between elements (gaps, padding, margins)
-4. Identify alignment (left, center, right, space-between)
-5. Identify the hierarchy (what contains what)
+AUTO LAYOUT PROPERTIES:
+- layoutMode: "HORIZONTAL" or "VERTICAL"
+- itemSpacing: gap between children (8, 12, 16, 20, 24, 32)
+- paddingTop, paddingBottom, paddingLeft, paddingRight
+- primaryAxisAlignItems: "MIN", "CENTER", "MAX", "SPACE_BETWEEN"
+- counterAxisAlignItems: "MIN", "CENTER", "MAX"
+- primaryAxisSizingMode: "AUTO" or "FIXED"
+- counterAxisSizingMode: "AUTO" or "FIXED"
 
-LAYOUT PATTERNS TO DETECT:
-- Navbar: horizontal layout with logo on left, menu items on right (use justifyContent space-between)
-- Cards: container with padding, border-radius, possibly shadow
-- Lists: vertical stack with consistent spacing
-- Grid: rows containing multiple columns
-- Forms: labels above inputs, consistent spacing
-
-FOR HORIZONTAL LAYOUTS (like navbars):
-- Use layoutMode = "HORIZONTAL"
-- Use primaryAxisAlignItems = "SPACE_BETWEEN" for left/right separation
-- Use counterAxisAlignItems = "CENTER" for vertical centering
-
-FOR ICON + TEXT PAIRS:
-- Create a horizontal frame
-- Add a small rectangle (icon placeholder) + text
-- Gap between icon and text
-
-IMPORTANT MEASUREMENTS:
-- Estimate pixel positions from the image
-- Match padding values (8, 12, 16, 20, 24, 32 are common)
-- Match gap values between elements
-- Match border-radius (4, 8, 12, 16 are common)
+LAYOUT PATTERNS:
+- Navbar: HORIZONTAL + primaryAxisAlignItems="SPACE_BETWEEN"
+- Card: VERTICAL + padding + cornerRadius
+- List: VERTICAL + itemSpacing
+- Row of items: HORIZONTAL + itemSpacing
+- Centered content: primaryAxisAlignItems="CENTER" + counterAxisAlignItems="CENTER"
 
 RETURN ONLY CODE - Start with (async and end with })();
 
@@ -98,6 +89,7 @@ RETURN ONLY CODE - Start with (async and end with })();
 
   const rgb = (r,g,b) => ({r:r/255,g:g/255,b:b/255});
   
+  // Text helper
   const txt = (p,s,sz,c,st="Regular") => {
     const t=figma.createText();
     t.fontName={family:"Inter",style:st};
@@ -108,6 +100,27 @@ RETURN ONLY CODE - Start with (async and end with })();
     return t;
   };
   
+  // Auto Layout Frame helper
+  const autoFrame = (p, dir, gap=0, padX=0, padY=0) => {
+    const f = figma.createFrame();
+    f.layoutMode = dir; // "HORIZONTAL" or "VERTICAL"
+    f.itemSpacing = gap;
+    f.paddingLeft = f.paddingRight = padX;
+    f.paddingTop = f.paddingBottom = padY;
+    f.primaryAxisSizingMode = "AUTO";
+    f.counterAxisSizingMode = "AUTO";
+    f.fills = [];
+    if(p) p.appendChild(f);
+    return f;
+  };
+  
+  // Horizontal Auto Layout
+  const row = (p, gap=0, padX=0, padY=0) => autoFrame(p, "HORIZONTAL", gap, padX, padY);
+  
+  // Vertical Auto Layout  
+  const col = (p, gap=0, padX=0, padY=0) => autoFrame(p, "VERTICAL", gap, padX, padY);
+  
+  // Icon placeholder
   const icon = (p,w,h,c,r=4) => {
     const b=figma.createRectangle();
     b.resize(w,h);
@@ -117,45 +130,24 @@ RETURN ONLY CODE - Start with (async and end with })();
     return b;
   };
 
+  // Main container - Auto Layout
   const main = figma.createFrame();
   main.name = "${componentName || 'Component'}";
-  main.resize(${width}, ${height});
-  main.layoutMode = "HORIZONTAL";
-  main.primaryAxisSizingMode = "FIXED";
-  main.counterAxisSizingMode = "FIXED";
-  main.counterAxisAlignItems = "CENTER";
-  main.primaryAxisAlignItems = "SPACE_BETWEEN";
+  main.layoutMode = "VERTICAL";
+  main.primaryAxisSizingMode = "AUTO";
+  main.counterAxisSizingMode = "AUTO";
   main.fills = [{type:"SOLID",color:rgb(255,255,255)}];
-  main.paddingLeft = main.paddingRight = 24;
-  main.paddingTop = main.paddingBottom = 16;
+  main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 20;
+  main.itemSpacing = 16;
 
-  // LEFT SECTION
-  const leftSection = figma.createFrame();
-  leftSection.layoutMode = "HORIZONTAL";
-  leftSection.itemSpacing = 12;
-  leftSection.counterAxisAlignItems = "CENTER";
-  leftSection.primaryAxisSizingMode = "AUTO";
-  leftSection.counterAxisSizingMode = "AUTO";
-  leftSection.fills = [];
-  main.appendChild(leftSection);
-
-  // RIGHT SECTION  
-  const rightSection = figma.createFrame();
-  rightSection.layoutMode = "HORIZONTAL";
-  rightSection.itemSpacing = 24;
-  rightSection.counterAxisAlignItems = "CENTER";
-  rightSection.primaryAxisSizingMode = "AUTO";
-  rightSection.counterAxisSizingMode = "AUTO";
-  rightSection.fills = [];
-  main.appendChild(rightSection);
-
-  // BUILD ELEMENTS HERE based on the image layout
+  // BUILD UI HERE using row(), col(), txt(), icon()
+  // All containers must use Auto Layout!
   
   figma.currentPage.appendChild(main);
   figma.viewport.scrollAndZoomIntoView([main]);
 })();
 
-Generate code that matches the EXACT LAYOUT and POSITIONS from the image.` }
+Generate code that uses ONLY Auto Layout. No absolute positioning. No manual x/y coordinates.` }
           ],
         }],
       }),
