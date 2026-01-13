@@ -871,38 +871,40 @@
                     )}
                   </div>
 
-                  {/* Figma 코드 생성/표시 */}
-                  <div style={styles.figmaSection}>
-                    {selectedRef.images[selectedImageIndex]?.figmaCode ? (
-                      <>
-                        <div style={styles.figmaHeader}>
-                          <span>◫ Figma Code</span>
-                          <button
-                            style={{ ...styles.copyBtn, ...(copySuccess ? styles.copyBtnSuccess : {}) }}
-                            onClick={() => copyToClipboard(selectedRef.images[selectedImageIndex].figmaCode)}
-                          >
-                            {copySuccess ? '✓ Copied!' : 'Copy'}
-                          </button>
-                        </div>
-                        <pre style={styles.figmaCode}>
-                          {selectedRef.images[selectedImageIndex].figmaCode}
-                        </pre>
-                        <p style={styles.figmaHint}>Figma → Plugins → Development → Open Console → 붙여넣기 후 실행</p>
-                      </>
-                    ) : (
-                      <button
-                        style={{ ...styles.generateBtn, ...(isGenerating ? styles.generateBtnDisabled : {}) }}
-                        onClick={() => handleGenerateFigma(selectedRef.id, selectedRef.images[selectedImageIndex].id)}
-                        disabled={isGenerating}
-                      >
-                        {isGenerating === selectedRef.images[selectedImageIndex]?.id ? (
-                          <><span style={styles.spinner}></span> Generating...</>
-                        ) : (
-                          '◫ Generate Figma Code'
-                        )}
-                      </button>
-                    )}
-                  </div>
+                  {/* Figma 코드 생성/표시 - Graphic 타입 제외 */}
+                  {selectedRef.type !== 'graphic' && (
+                    <div style={styles.figmaSection}>
+                      {selectedRef.images[selectedImageIndex]?.figmaCode ? (
+                        <>
+                          <div style={styles.figmaHeader}>
+                            <span>🤖 AI Figma Code</span>
+                            <button
+                              style={{ ...styles.copyBtn, ...(copySuccess ? styles.copyBtnSuccess : {}) }}
+                              onClick={() => copyToClipboard(selectedRef.images[selectedImageIndex].figmaCode)}
+                            >
+                              {copySuccess ? '✓ Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                          <pre style={styles.figmaCode}>
+                            {selectedRef.images[selectedImageIndex].figmaCode}
+                          </pre>
+                          <p style={styles.figmaHint}>Figma → Plugins → Development → Open Console → 붙여넣기 후 실행</p>
+                        </>
+                      ) : (
+                        <button
+                          style={{ ...styles.generateBtn, ...(isGenerating ? styles.generateBtnDisabled : {}) }}
+                          onClick={() => handleGenerateFigma(selectedRef.id, selectedRef.images[selectedImageIndex].id)}
+                          disabled={isGenerating}
+                        >
+                          {isGenerating === selectedRef.images[selectedImageIndex]?.id ? (
+                            <><span style={styles.spinner}></span> AI 분석 중...</>
+                          ) : (
+                            '🤖 AI로 Figma 코드 생성'
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <div style={styles.modalFooter}>
                     <span>{selectedRef.addedAt}</span>
