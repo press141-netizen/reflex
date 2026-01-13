@@ -54,42 +54,43 @@ export default async function handler(req, res) {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mime, data: image } },
-            { type: 'text', text: `Convert this UI screenshot to Figma Plugin API code.
-Image size: ${width}x${height}px${contextInfo}
+            { type: 'text', text: `Convert this UI to Figma code. Size: ${width}x${height}px${contextInfo}
 
-CRITICAL RULES:
-1. ALWAYS use Auto Layout (layoutMode) - NEVER use absolute positioning
-2. Every container must have layoutMode = "HORIZONTAL" or "VERTICAL"
-3. Use itemSpacing for gaps between children
-4. Use padding for internal spacing
-5. Match the exact layout structure from the image
+## PRIORITY ORDER (MOST IMPORTANT FIRST):
+1. LAYOUT STRUCTURE - exact arrangement of elements
+2. COLOR VALUES - use eyedropper precision (hex values)
+3. SPACING - gaps, padding, margins
+4. Text content is NOT important - use placeholder text like "텍스트", "Label", "Title"
 
-AUTO LAYOUT PROPERTIES:
-- layoutMode: "HORIZONTAL" or "VERTICAL"
-- itemSpacing: gap between children (8, 12, 16, 20, 24, 32)
-- paddingTop, paddingBottom, paddingLeft, paddingRight
-- primaryAxisAlignItems: "MIN", "CENTER", "MAX", "SPACE_BETWEEN"
-- counterAxisAlignItems: "MIN", "CENTER", "MAX"
-- primaryAxisSizingMode: "AUTO" or "FIXED"
-- counterAxisSizingMode: "AUTO" or "FIXED"
+## LAYOUT ANALYSIS METHOD:
+1. Draw invisible grid lines - identify rows and columns
+2. For each section, ask: "Is this HORIZONTAL or VERTICAL arrangement?"
+3. Identify nesting: what contains what?
+4. Measure approximate pixel gaps between elements
 
-LAYOUT PATTERNS:
-- Navbar: HORIZONTAL + primaryAxisAlignItems="SPACE_BETWEEN"
-- Card: VERTICAL + padding + cornerRadius
-- List: VERTICAL + itemSpacing
-- Row of items: HORIZONTAL + itemSpacing
-- Centered content: primaryAxisAlignItems="CENTER" + counterAxisAlignItems="CENTER"
+## STRUCTURE RULES:
+- If elements are side by side → HORIZONTAL (row)
+- If elements are stacked → VERTICAL (col)
+- Sidebar + Content = row([sidebar, content])
+- Header above Content = col([header, content])
+- Cards in a row = row([card1, card2, card3])
 
-RETURN ONLY CODE - Start with (async and end with })();
+## COLOR EXTRACTION:
+- Look at ACTUAL colors in the image
+- Background colors (light gray, white, etc.)
+- Text colors (black, gray, green, red, blue)
+- Accent colors (buttons, highlights, badges)
+- Extract as close to real hex values as possible
 
+## CODE TEMPLATE:
 (async () => {
   await figma.loadFontAsync({family:"Inter",style:"Regular"});
   await figma.loadFontAsync({family:"Inter",style:"Medium"});
   await figma.loadFontAsync({family:"Inter",style:"Bold"});
 
   const rgb = (r,g,b) => ({r:r/255,g:g/255,b:b/255});
+  const hex = (h) => {const v=h.replace('#','');return rgb(parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16));};
   
-  // Text helper
   const txt = (p,s,sz,c,st="Regular") => {
     const t=figma.createText();
     t.fontName={family:"Inter",style:st};
@@ -100,13 +101,19 @@ RETURN ONLY CODE - Start with (async and end with })();
     return t;
   };
   
-  // Auto Layout Frame helper
-  const autoFrame = (p, dir, gap=0, padX=0, padY=0) => {
+  const rect = (p,w,h,c,r=0) => {
+    const b=figma.createRectangle();
+    b.resize(w,h);
+    b.fills=[{type:"SOLID",color:c}];
+    if(r)b.cornerRadius=r;
+    p.appendChild(b);
+    return b;
+  };
+  
+  const frame = (p, dir, gap=0) => {
     const f = figma.createFrame();
-    f.layoutMode = dir; // "HORIZONTAL" or "VERTICAL"
+    f.layoutMode = dir;
     f.itemSpacing = gap;
-    f.paddingLeft = f.paddingRight = padX;
-    f.paddingTop = f.paddingBottom = padY;
     f.primaryAxisSizingMode = "AUTO";
     f.counterAxisSizingMode = "AUTO";
     f.fills = [];
@@ -114,40 +121,43 @@ RETURN ONLY CODE - Start with (async and end with })();
     return f;
   };
   
-  // Horizontal Auto Layout
-  const row = (p, gap=0, padX=0, padY=0) => autoFrame(p, "HORIZONTAL", gap, padX, padY);
+  const row = (p, gap=0) => frame(p, "HORIZONTAL", gap);
+  const col = (p, gap=0) => frame(p, "VERTICAL", gap);
   
-  // Vertical Auto Layout  
-  const col = (p, gap=0, padX=0, padY=0) => autoFrame(p, "VERTICAL", gap, padX, padY);
-  
-  // Icon placeholder
-  const icon = (p,w,h,c,r=4) => {
-    const b=figma.createRectangle();
-    b.resize(w,h);
-    b.fills=[{type:"SOLID",color:c}];
-    b.cornerRadius=r;
-    p.appendChild(b);
-    return b;
+  const card = (p, w, h, bgColor, radius=8, padX=16, padY=16, gap=12) => {
+    const f = figma.createFrame();
+    f.layoutMode = "VERTICAL";
+    f.itemSpacing = gap;
+    f.paddingLeft = f.paddingRight = padX;
+    f.paddingTop = f.paddingBottom = padY;
+    f.primaryAxisSizingMode = "FIXED";
+    f.counterAxisSizingMode = "FIXED";
+    f.resize(w, h);
+    f.fills = [{type:"SOLID",color:bgColor}];
+    f.cornerRadius = radius;
+    if(p) p.appendChild(f);
+    return f;
   };
 
-  // Main container - Auto Layout
+  // Main
   const main = figma.createFrame();
   main.name = "${componentName || 'Component'}";
   main.layoutMode = "VERTICAL";
   main.primaryAxisSizingMode = "AUTO";
   main.counterAxisSizingMode = "AUTO";
-  main.fills = [{type:"SOLID",color:rgb(255,255,255)}];
+  main.fills = [{type:"SOLID",color:hex("#FFFFFF")}];
   main.paddingTop = main.paddingBottom = main.paddingLeft = main.paddingRight = 20;
   main.itemSpacing = 16;
 
-  // BUILD UI HERE using row(), col(), txt(), icon()
-  // All containers must use Auto Layout!
+  // === ANALYZE THE IMAGE AND BUILD MATCHING STRUCTURE ===
+  // Focus on: exact layout hierarchy, real colors from image
+  // Text can be placeholder: "텍스트", "Label", etc.
   
   figma.currentPage.appendChild(main);
   figma.viewport.scrollAndZoomIntoView([main]);
 })();
 
-Generate code that uses ONLY Auto Layout. No absolute positioning. No manual x/y coordinates.` }
+OUTPUT: Only JavaScript code. Match the EXACT visual layout structure and colors from the image.` }
           ],
         }],
       }),
@@ -164,13 +174,13 @@ Generate code that uses ONLY Auto Layout. No absolute positioning. No manual x/y
     // Clean markdown
     code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
     
-    // Remove any text before (async
+    // Remove text before (async
     const asyncIndex = code.indexOf('(async');
     if (asyncIndex > 0) {
       code = code.substring(asyncIndex);
     }
     
-    // Remove any text after the closing })();
+    // Remove text after })();
     const endIndex = code.lastIndexOf('})();');
     if (endIndex !== -1) {
       code = code.substring(0, endIndex + 5);
@@ -180,9 +190,8 @@ Generate code that uses ONLY Auto Layout. No absolute positioning. No manual x/y
     code = code.replace(/primaryAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'primaryAxisSizingMode = "AUTO"');
     code = code.replace(/counterAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'counterAxisSizingMode = "AUTO"');
     code = code.replace(/layoutAlign\s*=\s*["']FILL["']/gi, 'layoutAlign = "STRETCH"');
-    code = code.replace(/justifyContent/gi, 'primaryAxisAlignItems');
     
-    // Ensure code completion
+    // Ensure completion
     if (!code.includes('figma.currentPage.appendChild')) {
       code += '\n  figma.currentPage.appendChild(main);\n  figma.viewport.scrollAndZoomIntoView([main]);\n})();';
     }
