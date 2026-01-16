@@ -29,7 +29,8 @@ export default async function handler(req, res) {
 
   // boardId 파라미터 (기본값: public)
   const { boardId = 'public' } = req.query;
-  const BOARD_KEY = `reflex:${boardId}`;
+  // public은 기존 main 키 사용 (데이터 호환)
+  const BOARD_KEY = boardId === 'public' ? 'reflex:main' : `reflex:${boardId}`;
 
   try {
     // GET - 데이터 로드
