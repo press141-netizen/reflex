@@ -26,7 +26,8 @@ export default async function handler(req, res) {
     return d.result;
   };
 
-  const BOARD_KEY = 'reflex:main';
+  const { boardId = 'public' } = req.query;
+  const BOARD_KEY = `reflex:${boardId}`;
 
   try {
     const { customCategories } = req.body;
