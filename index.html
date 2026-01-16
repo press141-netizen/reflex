@@ -67,7 +67,14 @@
     ];
 
     function App() {
-      // 공용 보드만 사용
+      // URL에서 팀 ID 추출 (/t/{teamId} 형식)
+      const getTeamId = () => {
+        const path = window.location.pathname;
+        const match = path.match(/^\/t\/(.+)$/);
+        return match ? match[1] : null;
+      };
+      
+      const [teamId, setTeamId] = useState(getTeamId());
       const [references, setReferences] = useState([]);
       const [customCategories, setCustomCategories] = useState({ web: [], mobile: [], graphic: [], component: [] });
       const [isLoading, setIsLoading] = useState(true);
@@ -90,6 +97,9 @@
       const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
       const tagInputRef = useRef(null);
       const categoryInputRef = useRef(null);
+      
+      // 현재 보드 ID (팀이면 팀ID, 아니면 public)
+      const currentBoardId = teamId || 'public';
       
       // 모달 닫기 - mousedown과 mouseup이 같은 overlay에서 발생했을 때만 닫기
       const mouseDownTarget = useRef(null);
@@ -130,6 +140,7 @@
         tags: [],
         colors: [],
         hexColor: '',
+        visibility: 'public', // 'public' 또는 'team'
       });
 
       // 컬러 옵션
@@ -146,11 +157,11 @@
         { id: 'white', color: '#f9fafb' },
       ];
 
-      // 서버에서 데이터 로드 (한 번에 모두)
+      // 서버에서 데이터 로드
       useEffect(() => {
         const loadData = async () => {
           try {
-            const res = await fetch('/api/boards');
+            const res = await fetch(`/api/boards?boardId=${currentBoardId}`);
             const data = await res.json();
             setReferences(data.references || []);
             if (data.customCategories) {
@@ -163,7 +174,7 @@
           }
         };
         loadData();
-      }, []);
+      }, [currentBoardId]);
 
       // 전체 태그 목록 (현재 타입/카테고리에 해당하는 레퍼런스에서만)
       const visibleTags = useMemo(() => {
@@ -438,6 +449,13 @@
           return;
         }
         
+        // 팀 보드인데 public 선택하면 경고
+        if (teamId && newRef.visibility === 'public') {
+          if (!confirm('공용 보드에 저장하면 모든 사용자가 볼 수 있습니다. 계속하시겠습니까?')) {
+            return;
+          }
+        }
+        
         setIsSaving(true);
         
         try {
@@ -453,14 +471,19 @@
           );
           
           const addedAt = formatDateTime();
+          
+          // visibility에 따라 저장할 보드 결정
+          const targetBoardId = newRef.visibility === 'team' && teamId ? teamId : 'public';
+          
           const reference = {
             ...newRef,
             images: uploadedImages,
             addedAt,
+            boardId: targetBoardId, // 어느 보드에 저장되었는지 기록
           };
           
           // 서버에 저장
-          const res = await fetch(`/api/boards`, {
+          const res = await fetch(`/api/boards?boardId=${targetBoardId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reference }),
@@ -468,7 +491,12 @@
           
           const data = await res.json();
           if (data.success) {
-            setReferences(prev => [data.reference, ...prev]);
+            // 현재 보드에 저장된 경우만 목록에 추가
+            if (targetBoardId === currentBoardId) {
+              setReferences(prev => [data.reference, ...prev]);
+            } else {
+              alert(`${newRef.visibility === 'public' ? '공용' : '팀'} 보드에 저장되었습니다.`);
+            }
             
             // 컴포넌트로 체크된 이미지들 자동 추가
             const componentImages = uploadedImages.filter(img => img.isComponent);
@@ -480,22 +508,24 @@
                 images: [{ ...componentImages[i], isComponent: false }],
                 category: 'card',
                 tags: [...newRef.tags],
+                visibility: newRef.visibility,
+                boardId: targetBoardId,
               };
               
-              const compRes = await fetch(`/api/boards`, {
+              const compRes = await fetch(`/api/boards?boardId=${targetBoardId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reference: componentRef }),
               });
               const compData = await compRes.json();
-              if (compData.success) {
+              if (compData.success && targetBoardId === currentBoardId) {
                 setReferences(prev => [compData.reference, ...prev]);
               }
             }
           }
           
           setIsAddModalOpen(false);
-          setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [], colors: [], hexColor: '' });
+          setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [], colors: [], hexColor: '', visibility: teamId ? 'team' : 'public' });
         } catch (error) {
           console.error('Failed to add reference:', error);
           alert('저장에 실패했습니다.');
@@ -521,17 +551,46 @@
             })
           );
           
-          const updatedRef = { ...editRef, images: uploadedImages };
+          // visibility가 변경되었는지 확인
+          const oldBoardId = editRef.boardId || currentBoardId;
+          const newBoardId = editRef.visibility === 'team' && teamId ? teamId : 'public';
           
-          const res = await fetch(`/api/boards`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reference: updatedRef }),
-          });
+          const updatedRef = { ...editRef, images: uploadedImages, boardId: newBoardId };
           
-          if (res.ok) {
-            setReferences(prev => prev.map(ref => ref.id === editRef.id ? updatedRef : ref));
-            setSelectedRef(updatedRef);
+          // 보드가 변경된 경우
+          if (oldBoardId !== newBoardId) {
+            // 기존 보드에서 삭제
+            await fetch(`/api/boards?boardId=${oldBoardId}`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ referenceId: editRef.id }),
+            });
+            
+            // 새 보드에 추가
+            const res = await fetch(`/api/boards?boardId=${newBoardId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reference: updatedRef }),
+            });
+            
+            const data = await res.json();
+            if (data.success) {
+              // 현재 보드에서는 삭제
+              setReferences(prev => prev.filter(ref => ref.id !== editRef.id));
+              alert(`${editRef.visibility === 'public' ? '공용' : '팀'} 보드로 이동되었습니다.`);
+            }
+          } else {
+            // 같은 보드 내 수정
+            const res = await fetch(`/api/boards?boardId=${newBoardId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reference: updatedRef }),
+            });
+          
+            if (res.ok) {
+              setReferences(prev => prev.map(ref => ref.id === editRef.id ? updatedRef : ref));
+              setSelectedRef(updatedRef);
+            }
           }
         } catch (error) {
           console.error('Failed to save:', error);
@@ -545,8 +604,11 @@
       const handleDeleteReference = async (id) => {
         if (!confirm('정말 삭제하시겠습니까?')) return;
         
+        const ref = references.find(r => r.id === id);
+        const boardId = ref?.boardId || currentBoardId;
+        
         try {
-          await fetch(`/api/boards`, {
+          await fetch(`/api/boards?boardId=${boardId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ referenceId: id }),
@@ -666,6 +728,24 @@
         );
       };
 
+      // 팀 보드 생성
+      const createTeamBoard = () => {
+        const newTeamId = Math.random().toString(36).substr(2, 8);
+        const teamUrl = `${window.location.origin}/t/${newTeamId}`;
+        navigator.clipboard.writeText(teamUrl);
+        alert(`팀 보드가 생성되었습니다!\n\n링크가 복사되었습니다:\n${teamUrl}\n\n이 링크를 팀원들에게 공유하세요.`);
+        window.location.href = `/t/${newTeamId}`;
+      };
+
+      // 현재 보드 링크 복사
+      const copyBoardLink = () => {
+        const url = teamId 
+          ? `${window.location.origin}/t/${teamId}`
+          : window.location.origin;
+        navigator.clipboard.writeText(url);
+        alert('보드 링크가 복사되었습니다!');
+      };
+
       // 로딩 화면
       if (isLoading) {
         return (
@@ -686,10 +766,29 @@
               <div style={styles.logo}>
                 <span style={styles.logoIcon}>◈</span>
                 <span style={styles.logoText}>Reflex</span>
+                {teamId && (
+                  <span style={styles.teamBadge}>👥 팀 보드</span>
+                )}
               </div>
-              <button style={styles.addButton} onClick={() => setIsAddModalOpen(true)} disabled={isSaving}>
-                {isSaving ? 'Saving...' : '+ Add Reference'}
-              </button>
+              <div style={styles.headerActions}>
+                {teamId ? (
+                  <>
+                    <button style={styles.headerBtn} onClick={copyBoardLink} title="팀 링크 복사">
+                      🔗 링크 복사
+                    </button>
+                    <button style={styles.headerBtn} onClick={() => window.location.href = '/'} title="공용 보드로">
+                      🌐 공용 보드
+                    </button>
+                  </>
+                ) : (
+                  <button style={styles.headerBtn} onClick={createTeamBoard} title="팀 보드 생성">
+                    👥 팀 보드 생성
+                  </button>
+                )}
+                <button style={styles.addButton} onClick={() => { setNewRef(prev => ({...prev, visibility: teamId ? 'team' : 'public'})); setIsAddModalOpen(true); }} disabled={isSaving}>
+                  {isSaving ? 'Saving...' : '+ Add Reference'}
+                </button>
+              </div>
             </div>
           </header>
 
@@ -1154,6 +1253,32 @@
                   </div>
                 </div>
 
+                {/* Visibility */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>저장 위치</label>
+                  <div style={styles.visibilityToggle}>
+                    <button
+                      style={{...styles.visibilityBtn, ...(newRef.visibility === 'public' ? styles.visibilityBtnActive : {})}}
+                      onClick={() => setNewRef(p => ({ ...p, visibility: 'public' }))}
+                    >
+                      🌐 공용 보드
+                    </button>
+                    {teamId && (
+                      <button
+                        style={{...styles.visibilityBtn, ...(newRef.visibility === 'team' ? styles.visibilityBtnActive : {})}}
+                        onClick={() => setNewRef(p => ({ ...p, visibility: 'team' }))}
+                      >
+                        👥 팀 보드
+                      </button>
+                    )}
+                  </div>
+                  <p style={styles.visibilityHint}>
+                    {newRef.visibility === 'public' 
+                      ? '모든 사용자가 볼 수 있습니다' 
+                      : '팀 링크를 가진 사람만 볼 수 있습니다'}
+                  </p>
+                </div>
+
                 <button style={styles.submitBtn} onClick={handleAddReference}>
                   Add Reference
                 </button>
@@ -1379,6 +1504,30 @@
                   </div>
                 </div>
 
+                {/* Visibility - 보드 이동 */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>저장 위치</label>
+                  <div style={styles.visibilityToggle}>
+                    <button
+                      style={{...styles.visibilityBtn, ...(editRef.visibility === 'public' || (!editRef.visibility && !teamId) ? styles.visibilityBtnActive : {})}}
+                      onClick={() => setEditRef(p => ({ ...p, visibility: 'public' }))}
+                    >
+                      🌐 공용 보드
+                    </button>
+                    <button
+                      style={{...styles.visibilityBtn, ...(editRef.visibility === 'team' || (!editRef.visibility && teamId) ? styles.visibilityBtnActive : {})}}
+                      onClick={() => setEditRef(p => ({ ...p, visibility: 'team' }))}
+                    >
+                      👥 팀 보드
+                    </button>
+                  </div>
+                  <p style={styles.visibilityHint}>
+                    {(editRef.visibility === 'team' || (!editRef.visibility && teamId))
+                      ? '팀 링크를 가진 사람만 볼 수 있습니다' 
+                      : '모든 사용자가 볼 수 있습니다'}
+                  </p>
+                </div>
+
                 <div style={styles.editBtns}>
                   <button style={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>Cancel</button>
                   <button style={styles.submitBtn} onClick={handleSaveEdit}>Save Changes</button>
@@ -1404,10 +1553,14 @@
       logo: { display: 'flex', alignItems: 'center', gap: '8px' },
       logoIcon: { fontSize: '28px', color: '#6366f1' },
       logoText: { fontSize: '24px', fontWeight: '700', fontFamily: '"Space Grotesk", sans-serif' },
-      boardBadge: { fontSize: '12px', background: '#f0f0ff', color: '#6366f1', padding: '4px 8px', borderRadius: '6px', marginLeft: '8px' },
+      teamBadge: { fontSize: '12px', background: '#ecfdf5', color: '#059669', padding: '4px 10px', borderRadius: '6px', marginLeft: '12px', fontWeight: '500' },
       headerActions: { display: 'flex', gap: '8px', alignItems: 'center' },
-      boardBtn: { width: '40px', height: '40px', background: '#f5f5f5', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      headerBtn: { padding: '8px 16px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontFamily: '"Outfit", sans-serif', color: '#555' },
       addButton: { padding: '10px 20px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontFamily: '"Outfit", sans-serif' },
+      visibilityToggle: { display: 'flex', gap: '8px', marginBottom: '8px' },
+      visibilityBtn: { flex: 1, padding: '12px', background: '#f5f5f5', border: '2px solid transparent', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontFamily: '"Outfit", sans-serif', textAlign: 'center' },
+      visibilityBtnActive: { background: '#f0f0ff', borderColor: '#6366f1', color: '#6366f1' },
+      visibilityHint: { fontSize: '12px', color: '#888', marginTop: '4px' },
       filterSection: { maxWidth: '1400px', margin: '0 auto 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' },
       typeToggle: { display: 'flex', gap: '8px' },
       typeButton: { padding: '8px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontFamily: '"Outfit", sans-serif', fontSize: '14px' },
