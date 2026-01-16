@@ -14,7 +14,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Storage not configured' });
   }
 
-  // Redis 명령어 실행
   const redis = async (cmd) => {
     const r = await fetch(KV_URL, {
       method: 'POST',
@@ -28,10 +27,12 @@ export default async function handler(req, res) {
     return d.result;
   };
 
-  const BOARD_KEY = 'reflex:main';
+  // boardId 파라미터 (기본값: public)
+  const { boardId = 'public' } = req.query;
+  const BOARD_KEY = `reflex:${boardId}`;
 
   try {
-    // GET - 전체 데이터 로드
+    // GET - 데이터 로드
     if (req.method === 'GET') {
       const raw = await redis(['GET', BOARD_KEY]);
       if (raw) {
