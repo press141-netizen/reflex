@@ -140,7 +140,8 @@
         tags: [],
         colors: [],
         hexColor: '',
-        visibility: 'public', // 'public' 또는 'team'
+        visibility: 'public',
+        targetTeamId: '',
       });
 
       // 컬러 옵션
@@ -449,11 +450,10 @@
           return;
         }
         
-        // 팀 보드인데 public 선택하면 경고
-        if (teamId && newRef.visibility === 'public') {
-          if (!confirm('공용 보드에 저장하면 모든 사용자가 볼 수 있습니다. 계속하시겠습니까?')) {
-            return;
-          }
+        // 팀 보드 선택했는데 ID 없으면 에러
+        if (newRef.visibility === 'team' && !newRef.targetTeamId) {
+          alert('팀 보드 ID를 입력해주세요.');
+          return;
         }
         
         setIsSaving(true);
@@ -473,14 +473,16 @@
           const addedAt = formatDateTime();
           
           // visibility에 따라 저장할 보드 결정
-          const targetBoardId = newRef.visibility === 'team' && teamId ? teamId : 'public';
+          const targetBoardId = newRef.visibility === 'team' ? newRef.targetTeamId : 'public';
           
           const reference = {
             ...newRef,
             images: uploadedImages,
             addedAt,
-            boardId: targetBoardId, // 어느 보드에 저장되었는지 기록
+            boardId: targetBoardId,
+            targetTeamId: undefined, // 임시 필드 제거
           };
+          delete reference.targetTeamId;
           
           // 서버에 저장
           const res = await fetch(`/api/boards?boardId=${targetBoardId}`, {
@@ -525,7 +527,7 @@
           }
           
           setIsAddModalOpen(false);
-          setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [], colors: [], hexColor: '', visibility: teamId ? 'team' : 'public' });
+          setNewRef({ type: 'web', title: '', url: '', images: [], category: 'landing', tags: [], colors: [], hexColor: '', visibility: 'public', targetTeamId: '' });
         } catch (error) {
           console.error('Failed to add reference:', error);
           alert('저장에 실패했습니다.');
@@ -537,6 +539,12 @@
       // 레퍼런스 수정 저장
       const handleSaveEdit = async () => {
         if (!editRef.title) return;
+        
+        // 팀 보드 선택했는데 ID 없으면 에러
+        if (editRef.visibility === 'team' && !editRef.targetTeamId) {
+          alert('팀 보드 ID를 입력해주세요.');
+          return;
+        }
         
         setIsSaving(true);
         try {
@@ -551,11 +559,18 @@
             })
           );
           
-          // visibility가 변경되었는지 확인
+          // 기존 보드 ID (없으면 현재 보드)
           const oldBoardId = editRef.boardId || currentBoardId;
-          const newBoardId = editRef.visibility === 'team' && teamId ? teamId : 'public';
+          // 새 보드 ID
+          const newBoardId = editRef.visibility === 'team' ? editRef.targetTeamId : 'public';
           
-          const updatedRef = { ...editRef, images: uploadedImages, boardId: newBoardId };
+          const updatedRef = { 
+            ...editRef, 
+            images: uploadedImages, 
+            boardId: newBoardId,
+            targetTeamId: undefined, // 임시 필드 제거
+          };
+          delete updatedRef.targetTeamId;
           
           // 보드가 변경된 경우
           if (oldBoardId !== newBoardId) {
@@ -1259,24 +1274,34 @@
                   <div style={styles.visibilityToggle}>
                     <button
                       style={{...styles.visibilityBtn, ...(newRef.visibility === 'public' ? styles.visibilityBtnActive : {})}}
-                      onClick={() => setNewRef(p => ({ ...p, visibility: 'public' }))}
+                      onClick={() => setNewRef(p => ({ ...p, visibility: 'public', targetTeamId: '' }))}
                     >
                       🌐 공용 보드
                     </button>
-                    {teamId && (
-                      <button
-                        style={{...styles.visibilityBtn, ...(newRef.visibility === 'team' ? styles.visibilityBtnActive : {})}}
-                        onClick={() => setNewRef(p => ({ ...p, visibility: 'team' }))}
-                      >
-                        👥 팀 보드
-                      </button>
-                    )}
+                    <button
+                      style={{...styles.visibilityBtn, ...(newRef.visibility === 'team' ? styles.visibilityBtnActive : {})}}
+                      onClick={() => setNewRef(p => ({ ...p, visibility: 'team', targetTeamId: teamId || '' }))}
+                    >
+                      👥 팀 보드
+                    </button>
                   </div>
-                  <p style={styles.visibilityHint}>
-                    {newRef.visibility === 'public' 
-                      ? '모든 사용자가 볼 수 있습니다' 
-                      : '팀 링크를 가진 사람만 볼 수 있습니다'}
-                  </p>
+                  {newRef.visibility === 'team' && (
+                    <div style={{marginTop: '8px'}}>
+                      <input
+                        type="text"
+                        placeholder="팀 보드 ID (예: abc123)"
+                        value={newRef.targetTeamId || ''}
+                        onChange={e => setNewRef(p => ({ ...p, targetTeamId: e.target.value }))}
+                        style={styles.input}
+                      />
+                      <p style={styles.visibilityHint}>
+                        팀 보드 URL: {window.location.origin}/t/{newRef.targetTeamId || '???'}
+                      </p>
+                    </div>
+                  )}
+                  {newRef.visibility !== 'team' && (
+                    <p style={styles.visibilityHint}>모든 사용자가 볼 수 있습니다</p>
+                  )}
                 </div>
 
                 <button style={styles.submitBtn} onClick={handleAddReference}>
@@ -1509,23 +1534,35 @@
                   <label style={styles.label}>저장 위치</label>
                   <div style={styles.visibilityToggle}>
                     <button
-                      style={{...styles.visibilityBtn, ...(editRef.visibility === 'public' || (!editRef.visibility && !teamId) ? styles.visibilityBtnActive : {})}}
-                      onClick={() => setEditRef(p => ({ ...p, visibility: 'public' }))}
+                      style={{...styles.visibilityBtn, ...(editRef.visibility === 'public' || (!editRef.visibility && !editRef.boardId) ? styles.visibilityBtnActive : {})}}
+                      onClick={() => setEditRef(p => ({ ...p, visibility: 'public', targetTeamId: '' }))}
                     >
                       🌐 공용 보드
                     </button>
                     <button
-                      style={{...styles.visibilityBtn, ...(editRef.visibility === 'team' || (!editRef.visibility && teamId) ? styles.visibilityBtnActive : {})}}
-                      onClick={() => setEditRef(p => ({ ...p, visibility: 'team' }))}
+                      style={{...styles.visibilityBtn, ...(editRef.visibility === 'team' ? styles.visibilityBtnActive : {})}}
+                      onClick={() => setEditRef(p => ({ ...p, visibility: 'team', targetTeamId: p.boardId && p.boardId !== 'public' ? p.boardId : (teamId || '') }))}
                     >
                       👥 팀 보드
                     </button>
                   </div>
-                  <p style={styles.visibilityHint}>
-                    {(editRef.visibility === 'team' || (!editRef.visibility && teamId))
-                      ? '팀 링크를 가진 사람만 볼 수 있습니다' 
-                      : '모든 사용자가 볼 수 있습니다'}
-                  </p>
+                  {editRef.visibility === 'team' && (
+                    <div style={{marginTop: '8px'}}>
+                      <input
+                        type="text"
+                        placeholder="팀 보드 ID (예: abc123)"
+                        value={editRef.targetTeamId || ''}
+                        onChange={e => setEditRef(p => ({ ...p, targetTeamId: e.target.value }))}
+                        style={styles.input}
+                      />
+                      <p style={styles.visibilityHint}>
+                        팀 보드 URL: {window.location.origin}/t/{editRef.targetTeamId || '???'}
+                      </p>
+                    </div>
+                  )}
+                  {editRef.visibility !== 'team' && (
+                    <p style={styles.visibilityHint}>모든 사용자가 볼 수 있습니다</p>
+                  )}
                 </div>
 
                 <div style={styles.editBtns}>
