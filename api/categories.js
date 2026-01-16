@@ -27,7 +27,8 @@ export default async function handler(req, res) {
   };
 
   const { boardId = 'public' } = req.query;
-  const BOARD_KEY = `reflex:${boardId}`;
+  // public은 기존 main 키 사용 (데이터 호환)
+  const BOARD_KEY = boardId === 'public' ? 'reflex:main' : `reflex:${boardId}`;
 
   try {
     const { customCategories } = req.body;
