@@ -1,3 +1,5 @@
+import { checkRateLimit } from './_utils/rateLimit.js';
+
 export const config = {
   maxDuration: 60,
 };
@@ -15,11 +17,50 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Rate limiting: 5 requests per hour per IP (to prevent AI API abuse)
+  const rateLimitResult = checkRateLimit(req, { maxRequests: 5, windowMs: 60 * 60 * 1000 });
+  if (rateLimitResult) {
+    res.setHeader('Retry-After', rateLimitResult.headers['Retry-After']);
+    res.setHeader('X-RateLimit-Limit', rateLimitResult.headers['X-RateLimit-Limit']);
+    res.setHeader('X-RateLimit-Remaining', rateLimitResult.headers['X-RateLimit-Remaining']);
+    res.setHeader('X-RateLimit-Reset', rateLimitResult.headers['X-RateLimit-Reset']);
+    return res.status(429).json(rateLimitResult.body);
+  }
+
   try {
     const { image, componentName, mimeType, imageWidth, imageHeight, context } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'Image is required' });
+    }
+
+    // Validate componentName
+    if (componentName && (typeof componentName !== 'string' || componentName.length > 100)) {
+      return res.status(400).json({ error: 'Component name must be string, max 100 characters' });
+    }
+
+    // Validate dimensions
+    if (imageWidth && (typeof imageWidth !== 'number' || imageWidth < 1 || imageWidth > 10000)) {
+      return res.status(400).json({ error: 'Image width must be between 1 and 10000' });
+    }
+    if (imageHeight && (typeof imageHeight !== 'number' || imageHeight < 1 || imageHeight > 10000)) {
+      return res.status(400).json({ error: 'Image height must be between 1 and 10000' });
+    }
+
+    // Validate mimeType
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (mimeType && !allowedMimeTypes.includes(mimeType)) {
+      return res.status(400).json({ error: 'Invalid image type' });
+    }
+
+    // Validate context
+    if (context) {
+      if (context.note && (typeof context.note !== 'string' || context.note.length > 1000)) {
+        return res.status(400).json({ error: 'Context note too long (max 1000 characters)' });
+      }
+      if (context.tags && (!Array.isArray(context.tags) || context.tags.length > 20)) {
+        return res.status(400).json({ error: 'Too many tags (max 20)' });
+      }
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -31,6 +72,11 @@ export default async function handler(req, res) {
     const width = imageWidth || 800;
     const height = imageHeight || 600;
     const mime = mimeType || 'image/png';
+
+    // Sanitize componentName to prevent injection
+    const safeName = componentName
+      ? componentName.replace(/[^a-zA-Z0-9_\- ]/g, '').slice(0, 50)
+      : 'Component';
 
     let contextInfo = '';
     if (context) {
@@ -141,7 +187,7 @@ export default async function handler(req, res) {
 
   // Main
   const main = figma.createFrame();
-  main.name = "${componentName || 'Component'}";
+  main.name = "${safeName}";
   main.layoutMode = "VERTICAL";
   main.primaryAxisSizingMode = "AUTO";
   main.counterAxisSizingMode = "AUTO";
@@ -199,6 +245,7 @@ OUTPUT: Only JavaScript code. Match the EXACT visual layout structure and colors
     return res.status(200).json({ success: true, figmaCode: code });
 
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    console.error('Analyze API Error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

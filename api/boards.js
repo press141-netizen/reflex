@@ -28,7 +28,12 @@ export default async function handler(req, res) {
   };
 
   // boardId 파라미터 (기본값: public)
-  const { boardId = 'public' } = req.query;
+  let { boardId = 'public' } = req.query;
+
+  // Sanitize boardId to prevent NoSQL injection
+  boardId = String(boardId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50);
+  if (!boardId) boardId = 'public';
+
   // public은 기존 main 키 사용 (데이터 호환)
   const BOARD_KEY = boardId === 'public' ? 'reflex:main' : `reflex:${boardId}`;
 
@@ -48,12 +53,23 @@ export default async function handler(req, res) {
       const { reference } = req.body;
       if (!reference) return res.status(400).json({ error: 'No reference' });
 
+      // Validate reference object size
+      const referenceSize = JSON.stringify(reference).length;
+      if (referenceSize > 1000000) { // 1MB limit
+        return res.status(400).json({ error: 'Reference too large (max 1MB)' });
+      }
+
       const raw = await redis(['GET', BOARD_KEY]);
       const data = raw ? JSON.parse(raw) : { references: [], customCategories: {} };
-      
+
+      // Limit total number of references
+      if (data.references.length >= 10000) {
+        return res.status(400).json({ error: 'Maximum references limit reached (10000)' });
+      }
+
       const newRef = { ...reference, id: Date.now() };
       data.references.unshift(newRef);
-      
+
       await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
       return res.status(201).json({ success: true, reference: newRef });
     }
@@ -92,6 +108,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (e) {
     console.error('API Error:', e);
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

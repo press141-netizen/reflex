@@ -13,6 +13,19 @@ export default async function handler(req, res) {
   const { image, contentType } = req.body;
   if (!image) return res.status(400).json({ error: 'No image' });
 
+  // Validate contentType
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+  if (contentType && !allowedTypes.includes(contentType)) {
+    return res.status(400).json({ error: 'Invalid image type. Allowed: png, jpeg, jpg, gif, webp' });
+  }
+
+  // Validate base64 size (check before Buffer creation to prevent DoS)
+  const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+  const estimatedSize = base64Data.length * 0.75; // Base64 is ~1.37x larger than binary
+  if (estimatedSize > 10 * 1024 * 1024) { // 10MB limit
+    return res.status(400).json({ error: 'Image too large (max 10MB)' });
+  }
+
   const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 
   // Blob 토큰 없으면 base64 그대로 반환
@@ -21,9 +34,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const base64 = image.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64, 'base64');
-    const ext = contentType?.split('/')[1] || 'png';
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Validate and sanitize file extension
+    const allowedExts = ['png', 'jpeg', 'jpg', 'gif', 'webp'];
+    let ext = contentType?.split('/')[1] || 'png';
+    if (!allowedExts.includes(ext)) {
+      ext = 'png';
+    }
+
     const filename = `reflex/${Date.now()}.${ext}`;
 
     const r = await fetch(`https://blob.vercel-storage.com/${filename}`, {
