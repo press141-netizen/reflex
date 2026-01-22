@@ -3,15 +3,29 @@
 
 const rateLimitStore = new Map();
 
-// Cleanup old entries every 10 minutes
-setInterval(() => {
+// Lazy cleanup: clean expired entries during requests (no setInterval)
+function cleanupExpiredEntries() {
   const now = Date.now();
+  let cleanedCount = 0;
+
   for (const [key, data] of rateLimitStore.entries()) {
-    if (now - data.resetTime > 0) {
+    if (now > data.resetTime) {
       rateLimitStore.delete(key);
+      cleanedCount++;
     }
   }
-}, 10 * 60 * 1000);
+
+  // Prevent unbounded growth: if map exceeds 1000 entries, remove oldest
+  if (rateLimitStore.size > 1000) {
+    const sortedEntries = Array.from(rateLimitStore.entries())
+      .sort((a, b) => a[1].resetTime - b[1].resetTime);
+
+    const toRemove = sortedEntries.slice(0, rateLimitStore.size - 1000);
+    toRemove.forEach(([key]) => rateLimitStore.delete(key));
+  }
+
+  return cleanedCount;
+}
 
 /**
  * Rate limit middleware for Vercel serverless functions
@@ -26,6 +40,11 @@ export function checkRateLimit(req, options = {}) {
     maxRequests = 10,  // Default: 10 requests
     windowMs = 60 * 60 * 1000  // Default: 1 hour
   } = options;
+
+  // Lazy cleanup: periodically clean expired entries (10% probability)
+  if (Math.random() < 0.1) {
+    cleanupExpiredEntries();
+  }
 
   // Get client identifier (IP address)
   const identifier =

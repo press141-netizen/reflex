@@ -38,17 +38,38 @@ export default async function handler(req, res) {
   const BOARD_KEY = boardId === 'public' ? 'reflex:main' : `reflex:${boardId}`;
 
   try {
-    // GET - 데이터 로드
+    // GET - 데이터 로드 (페이지네이션 지원)
     if (req.method === 'GET') {
+      const offset = parseInt(req.query.offset) || 0;
+      const limit = parseInt(req.query.limit) || 0; // 0 = no limit (전체 로드)
+
       const raw = await redis(['GET', BOARD_KEY]);
       if (raw) {
         const data = JSON.parse(raw);
+
+        // 페이지네이션이 요청된 경우
+        if (limit > 0) {
+          const total = data.references.length;
+          const paginatedRefs = data.references.slice(offset, offset + limit);
+          return res.status(200).json({
+            references: paginatedRefs,
+            customCategories: data.customCategories || {},
+            pagination: {
+              total,
+              offset,
+              limit,
+              hasMore: offset + limit < total
+            }
+          });
+        }
+
+        // 페이지네이션 없이 전체 로드 (기존 동작 유지)
         return res.status(200).json(data);
       }
       return res.status(200).json({ references: [], customCategories: {} });
     }
 
-    // POST - 새 레퍼런스 추가
+    // POST - 새 레퍼런스 추가 (재시도 로직으로 경쟁 상태 완화)
     if (req.method === 'POST') {
       const { reference } = req.body;
       if (!reference) return res.status(400).json({ error: 'No reference' });
@@ -59,50 +80,97 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Reference too large (max 1MB)' });
       }
 
-      const raw = await redis(['GET', BOARD_KEY]);
-      const data = raw ? JSON.parse(raw) : { references: [], customCategories: {} };
+      // 재시도 로직 (최대 3회)
+      let retries = 3;
+      let lastError = null;
 
-      // Limit total number of references
-      if (data.references.length >= 10000) {
-        return res.status(400).json({ error: 'Maximum references limit reached (10000)' });
+      while (retries > 0) {
+        try {
+          const raw = await redis(['GET', BOARD_KEY]);
+          const data = raw ? JSON.parse(raw) : { references: [], customCategories: {} };
+
+          // Limit total number of references
+          if (data.references.length >= 10000) {
+            return res.status(400).json({ error: 'Maximum references limit reached (10000)' });
+          }
+
+          const newRef = { ...reference, id: Date.now() + Math.random() };
+          data.references.unshift(newRef);
+
+          await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
+          return res.status(201).json({ success: true, reference: newRef });
+        } catch (err) {
+          lastError = err;
+          retries--;
+          if (retries > 0) {
+            // 짧은 지연 후 재시도
+            await new Promise(resolve => setTimeout(resolve, 50 * (4 - retries)));
+          }
+        }
       }
 
-      const newRef = { ...reference, id: Date.now() };
-      data.references.unshift(newRef);
-
-      await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
-      return res.status(201).json({ success: true, reference: newRef });
+      throw lastError || new Error('Failed after retries');
     }
 
-    // PUT - 레퍼런스 수정
+    // PUT - 레퍼런스 수정 (재시도 로직)
     if (req.method === 'PUT') {
       const { reference } = req.body;
       if (!reference?.id) return res.status(400).json({ error: 'No reference ID' });
 
-      const raw = await redis(['GET', BOARD_KEY]);
-      if (!raw) return res.status(404).json({ error: 'Not found' });
-      
-      const data = JSON.parse(raw);
-      const idx = data.references.findIndex(r => r.id === reference.id);
-      if (idx === -1) return res.status(404).json({ error: 'Reference not found' });
-      
-      data.references[idx] = reference;
-      await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
-      return res.status(200).json({ success: true });
+      let retries = 3;
+      let lastError = null;
+
+      while (retries > 0) {
+        try {
+          const raw = await redis(['GET', BOARD_KEY]);
+          if (!raw) return res.status(404).json({ error: 'Not found' });
+
+          const data = JSON.parse(raw);
+          const idx = data.references.findIndex(r => r.id === reference.id);
+          if (idx === -1) return res.status(404).json({ error: 'Reference not found' });
+
+          data.references[idx] = reference;
+          await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
+          return res.status(200).json({ success: true });
+        } catch (err) {
+          lastError = err;
+          retries--;
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 50 * (4 - retries)));
+          }
+        }
+      }
+
+      throw lastError || new Error('Failed after retries');
     }
 
-    // DELETE - 레퍼런스 삭제
+    // DELETE - 레퍼런스 삭제 (재시도 로직)
     if (req.method === 'DELETE') {
       const { referenceId } = req.body;
       if (!referenceId) return res.status(400).json({ error: 'No ID' });
 
-      const raw = await redis(['GET', BOARD_KEY]);
-      if (!raw) return res.status(404).json({ error: 'Not found' });
-      
-      const data = JSON.parse(raw);
-      data.references = data.references.filter(r => r.id !== referenceId);
-      await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
-      return res.status(200).json({ success: true });
+      let retries = 3;
+      let lastError = null;
+
+      while (retries > 0) {
+        try {
+          const raw = await redis(['GET', BOARD_KEY]);
+          if (!raw) return res.status(404).json({ error: 'Not found' });
+
+          const data = JSON.parse(raw);
+          data.references = data.references.filter(r => r.id !== referenceId);
+          await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
+          return res.status(200).json({ success: true });
+        } catch (err) {
+          lastError = err;
+          retries--;
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 50 * (4 - retries)));
+          }
+        }
+      }
+
+      throw lastError || new Error('Failed after retries');
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

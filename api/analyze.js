@@ -216,26 +216,27 @@ OUTPUT: Only JavaScript code. Match the EXACT visual layout structure and colors
 
     const data = await response.json();
     let code = data.content?.[0]?.text || '';
-    
-    // Clean markdown
-    code = code.replace(/```javascript\n?/gi, '').replace(/```js\n?/gi, '').replace(/```\n?/g, '').trim();
-    
+
+    // Clean markdown - 단일 패스로 최적화
+    code = code.replace(/```(?:javascript|js)?\n?/gi, '').trim();
+
     // Remove text before (async
     const asyncIndex = code.indexOf('(async');
     if (asyncIndex > 0) {
       code = code.substring(asyncIndex);
     }
-    
+
     // Remove text after })();
     const endIndex = code.lastIndexOf('})();');
     if (endIndex !== -1) {
       code = code.substring(0, endIndex + 5);
     }
-    
-    // Fix invalid Figma API values
-    code = code.replace(/primaryAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'primaryAxisSizingMode = "AUTO"');
-    code = code.replace(/counterAxisSizingMode\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi, 'counterAxisSizingMode = "AUTO"');
-    code = code.replace(/layoutAlign\s*=\s*["']FILL["']/gi, 'layoutAlign = "STRETCH"');
+
+    // Fix invalid Figma API values - 단일 패스로 최적화
+    code = code.replace(
+      /(primaryAxisSizingMode|counterAxisSizingMode)\s*=\s*["'](FILL_CONTAINER|FILL|HUG)["']/gi,
+      '$1 = "AUTO"'
+    ).replace(/layoutAlign\s*=\s*["']FILL["']/gi, 'layoutAlign = "STRETCH"');
     
     // Ensure completion
     if (!code.includes('figma.currentPage.appendChild')) {
