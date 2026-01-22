@@ -94,7 +94,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Maximum references limit reached (10000)' });
           }
 
-          const newRef = { ...reference, id: Date.now() + Math.random() };
+          const newRef = { ...reference, id: crypto.randomUUID() };
           data.references.unshift(newRef);
 
           await redis(['SET', BOARD_KEY, JSON.stringify(data)]);

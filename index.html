@@ -268,7 +268,7 @@
             const img = new Image();
             img.onload = () => {
               processedImages[index] = {
-                id: Date.now() + index + Math.random().toString(36).substr(2, 9),
+                id: crypto.randomUUID(),
                 src: ev.target.result,
                 note: '',
                 figmaCode: null,
@@ -769,7 +769,7 @@
 
       // 팀 보드 생성
       const createTeamBoard = useCallback(() => {
-        const newTeamId = Math.random().toString(36).substr(2, 8);
+        const newTeamId = crypto.randomUUID();
         const teamUrl = `${window.location.origin}/t/${newTeamId}`;
         navigator.clipboard.writeText(teamUrl);
         alert(`팀 보드가 생성되었습니다!\n\n링크가 복사되었습니다:\n${teamUrl}\n\n이 링크를 팀원들에게 공유하세요.`);
