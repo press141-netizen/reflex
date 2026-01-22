@@ -27,7 +27,7 @@
   <div id="root"></div>
   
   <script type="text/babel">
-    const { useState, useMemo, useEffect, useRef } = React;
+    const { useState, useMemo, useEffect, useRef, useCallback } = React;
 
     const TYPES = [
       { id: 'all', name: 'All', emoji: '✦' },
@@ -89,6 +89,7 @@
       const [activeType, setActiveType] = useState('all');
       const [activeCategory, setActiveCategory] = useState('all');
       const [searchQuery, setSearchQuery] = useState('');
+      const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
       const [selectedTags, setSelectedTags] = useState([]);
       const [selectedRef, setSelectedRef] = useState(null);
       const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -183,25 +184,38 @@
         loadData();
       }, [currentBoardId]);
 
-      // 전체 태그 목록 (현재 타입/카테고리에 해당하는 레퍼런스에서만)
-      const visibleTags = useMemo(() => {
-        const tags = new Set();
-        // 태그 선택 전 필터링 (타입, 카테고리, 검색어만 적용)
-        const baseFiltered = references.filter(ref => {
+      // 검색어 디바운싱 (300ms)
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          setDebouncedSearchQuery(searchQuery);
+        }, 300);
+
+        return () => clearTimeout(timer);
+      }, [searchQuery]);
+
+      // 베이스 필터링 (타입, 카테고리, 검색어) - 조기 반환으로 최적화
+      const baseFilteredReferences = useMemo(() => {
+        return references.filter(ref => {
           if (activeType !== 'all' && ref.type !== activeType) return false;
           if (activeCategory !== 'all' && ref.category !== activeCategory) return false;
-          if (searchQuery) {
-            const q = searchQuery.toLowerCase();
-            const titleMatch = ref.title.toLowerCase().includes(q);
-            const tagMatch = ref.tags?.some(t => t.toLowerCase().includes(q));
-            const noteMatch = ref.images?.some(img => img.note?.toLowerCase().includes(q));
-            if (!titleMatch && !tagMatch && !noteMatch) return false;
+          if (debouncedSearchQuery) {
+            const q = debouncedSearchQuery.toLowerCase();
+            // 조기 반환: 하나라도 매치되면 즉시 true 반환
+            if (ref.title.toLowerCase().includes(q)) return true;
+            if (ref.tags?.some(t => t.toLowerCase().includes(q))) return true;
+            if (ref.images?.some(img => img.note?.toLowerCase().includes(q))) return true;
+            return false;
           }
           return true;
         });
-        baseFiltered.forEach(ref => ref.tags?.forEach(tag => tags.add(tag)));
+      }, [references, activeType, activeCategory, debouncedSearchQuery]);
+
+      // 전체 태그 목록 (베이스 필터링 결과 재사용)
+      const visibleTags = useMemo(() => {
+        const tags = new Set();
+        baseFilteredReferences.forEach(ref => ref.tags?.forEach(tag => tags.add(tag)));
         return Array.from(tags).sort();
-      }, [references, activeType, activeCategory, searchQuery]);
+      }, [baseFilteredReferences]);
 
       // 전체 태그 목록 (태그 입력 자동완성용)
       const allTags = useMemo(() => {
@@ -232,51 +246,52 @@
         return result;
       }, [customCategories]);
 
-      // 필터링 (검색에 note 포함)
+      // 최종 필터링 (베이스 필터링 + 태그 필터)
       const filteredReferences = useMemo(() => {
-        return references.filter(ref => {
-          if (activeType !== 'all' && ref.type !== activeType) return false;
-          if (activeCategory !== 'all' && ref.category !== activeCategory) return false;
-          if (searchQuery) {
-            const q = searchQuery.toLowerCase();
-            const titleMatch = ref.title.toLowerCase().includes(q);
-            const tagMatch = ref.tags?.some(t => t.toLowerCase().includes(q));
-            const noteMatch = ref.images?.some(img => img.note?.toLowerCase().includes(q));
-            if (!titleMatch && !tagMatch && !noteMatch) return false;
-          }
-          if (selectedTags.length > 0 && !selectedTags.every(t => ref.tags?.includes(t))) return false;
-          return true;
-        });
-      }, [references, activeType, activeCategory, searchQuery, selectedTags]);
+        if (selectedTags.length === 0) return baseFilteredReferences;
+        return baseFilteredReferences.filter(ref =>
+          selectedTags.every(t => ref.tags?.includes(t))
+        );
+      }, [baseFilteredReferences, selectedTags]);
 
-      // 이미지 처리 함수 (파일 배열 받음)
+      // 이미지 처리 함수 (파일 배열 받음) - 배치 처리로 최적화
       const processImageFiles = (files, isEdit = false) => {
-        for (const file of files) {
-          if (file.type?.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-              const img = new Image();
-              img.onload = () => {
-                const newImage = {
-                  id: Date.now() + Math.random().toString(36).substr(2, 9),
-                  src: ev.target.result,
-                  note: '',
-                  figmaCode: null,
-                  isComponent: false,
-                  width: img.naturalWidth,
-                  height: img.naturalHeight,
-                };
-                if (isEdit && editRef) {
-                  setEditRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
-                } else {
-                  setNewRef(prev => ({ ...prev, images: [...prev.images, newImage] }));
-                }
+        const imageFiles = Array.from(files).filter(file => file.type?.startsWith('image/'));
+        if (imageFiles.length === 0) return;
+
+        const processedImages = [];
+        let loadedCount = 0;
+
+        imageFiles.forEach((file, index) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+              processedImages[index] = {
+                id: Date.now() + index + Math.random().toString(36).substr(2, 9),
+                src: ev.target.result,
+                note: '',
+                figmaCode: null,
+                isComponent: false,
+                width: img.naturalWidth,
+                height: img.naturalHeight,
               };
-              img.src = ev.target.result;
+              loadedCount++;
+
+              // 모든 이미지가 로드되면 한 번에 상태 업데이트
+              if (loadedCount === imageFiles.length) {
+                const validImages = processedImages.filter(Boolean);
+                if (isEdit && editRef) {
+                  setEditRef(prev => ({ ...prev, images: [...prev.images, ...validImages] }));
+                } else {
+                  setNewRef(prev => ({ ...prev, images: [...prev.images, ...validImages] }));
+                }
+              }
             };
-            reader.readAsDataURL(file);
-          }
-        }
+            img.src = ev.target.result;
+          };
+          reader.readAsDataURL(file);
+        });
       };
 
       // 이미지 업로드 핸들러 (input file)
@@ -506,28 +521,38 @@
               alert(`${newRef.visibility === 'public' ? '공용' : '팀'} 보드에 저장되었습니다.`);
             }
             
-            // 컴포넌트로 체크된 이미지들 자동 추가
+            // 컴포넌트로 체크된 이미지들 자동 추가 (병렬 처리)
             const componentImages = uploadedImages.filter(img => img.isComponent);
-            for (let i = 0; i < componentImages.length; i++) {
-              const componentRef = {
-                type: 'component',
-                title: `${newRef.title} - Component`,
-                url: newRef.url,
-                images: [{ ...componentImages[i], isComponent: false }],
-                category: 'card',
-                tags: [...newRef.tags],
-                visibility: newRef.visibility,
-                boardId: targetBoardId,
-              };
-              
-              const compRes = await fetch(`/api/boards?boardId=${targetBoardId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reference: componentRef }),
+            if (componentImages.length > 0) {
+              const componentPromises = componentImages.map(img => {
+                const componentRef = {
+                  type: 'component',
+                  title: `${newRef.title} - Component`,
+                  url: newRef.url,
+                  images: [{ ...img, isComponent: false }],
+                  category: 'card',
+                  tags: [...newRef.tags],
+                  visibility: newRef.visibility,
+                  boardId: targetBoardId,
+                };
+
+                return fetch(`/api/boards?boardId=${targetBoardId}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ reference: componentRef }),
+                }).then(res => res.json());
               });
-              const compData = await compRes.json();
-              if (compData.success && targetBoardId === currentBoardId) {
-                setReferences(prev => [compData.reference, ...prev]);
+
+              const componentResults = await Promise.all(componentPromises);
+
+              // 현재 보드에 추가된 컴포넌트만 목록에 반영
+              if (targetBoardId === currentBoardId) {
+                const newComponents = componentResults
+                  .filter(data => data.success)
+                  .map(data => data.reference);
+                if (newComponents.length > 0) {
+                  setReferences(prev => [...newComponents, ...prev]);
+                }
               }
             }
           }
@@ -622,25 +647,25 @@
       };
 
       // 레퍼런스 삭제
-      const handleDeleteReference = async (id) => {
+      const handleDeleteReference = useCallback(async (id) => {
         if (!confirm('정말 삭제하시겠습니까?')) return;
-        
+
         const ref = references.find(r => r.id === id);
         const boardId = ref?.boardId || currentBoardId;
-        
+
         try {
           await fetch(`/api/boards?boardId=${boardId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ referenceId: id }),
           });
-          
+
           setReferences(prev => prev.filter(ref => ref.id !== id));
           setSelectedRef(null);
         } catch (error) {
           console.error('Failed to delete:', error);
         }
-      };
+      }, [references, currentBoardId]);
 
       // Figma 코드 생성 (특정 이미지)
       const handleGenerateFigma = async (refId, imgId) => {
@@ -697,29 +722,22 @@
           if (!apiResponse.ok) throw new Error('API failed');
           
           const result = await apiResponse.json();
-          
+
           if (result.figmaCode) {
-            setReferences(prev => prev.map(r => {
-              if (r.id !== refId) return r;
-              return {
-                ...r,
-                images: r.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
-              };
-            }));
-            // 현재 선택된 ref 업데이트
-            if (selectedRef?.id === refId) {
-              setSelectedRef(prev => ({
-                ...prev,
-                images: prev.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
-              }));
-            }
-            
-            // 서버에도 저장
+            // 최적화: O(n×m) → O(n) - 특정 레퍼런스와 이미지만 업데이트
             const updatedRef = {
               ...ref,
               images: ref.images.map(i => i.id === imgId ? { ...i, figmaCode: result.figmaCode } : i)
             };
-            
+
+            setReferences(prev => prev.map(r => r.id === refId ? updatedRef : r));
+
+            // 현재 선택된 ref 업데이트
+            if (selectedRef?.id === refId) {
+              setSelectedRef(updatedRef);
+            }
+
+            // 서버에도 저장
             fetch(`/api/boards`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
@@ -736,36 +754,36 @@
 
       // 클립보드 복사 (피드백 포함)
       const [copySuccess, setCopySuccess] = useState(false);
-      const copyToClipboard = (code) => {
+      const copyToClipboard = useCallback((code) => {
         navigator.clipboard.writeText(code);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
-      };
+      }, []);
 
       // 태그 토글 (다중 선택)
-      const toggleTag = (tag) => {
-        setSelectedTags(prev => 
+      const toggleTag = useCallback((tag) => {
+        setSelectedTags(prev =>
           prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
         );
-      };
+      }, []);
 
       // 팀 보드 생성
-      const createTeamBoard = () => {
+      const createTeamBoard = useCallback(() => {
         const newTeamId = Math.random().toString(36).substr(2, 8);
         const teamUrl = `${window.location.origin}/t/${newTeamId}`;
         navigator.clipboard.writeText(teamUrl);
         alert(`팀 보드가 생성되었습니다!\n\n링크가 복사되었습니다:\n${teamUrl}\n\n이 링크를 팀원들에게 공유하세요.`);
         window.location.href = `/t/${newTeamId}`;
-      };
+      }, []);
 
       // 현재 보드 링크 복사
-      const copyBoardLink = () => {
-        const url = teamId 
+      const copyBoardLink = useCallback(() => {
+        const url = teamId
           ? `${window.location.origin}/t/${teamId}`
           : window.location.origin;
         navigator.clipboard.writeText(url);
         alert('보드 링크가 복사되었습니다!');
-      };
+      }, [teamId]);
 
       // 로딩 화면
       if (isLoading) {
