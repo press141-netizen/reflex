@@ -23,6 +23,25 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Image is required' }) };
     }
 
+    // Validate componentName
+    if (componentName && (typeof componentName !== 'string' || componentName.length > 100)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Component name must be string, max 100 characters' }) };
+    }
+
+    // Validate dimensions
+    if (imageWidth && (typeof imageWidth !== 'number' || imageWidth < 1 || imageWidth > 10000)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Image width must be between 1 and 10000' }) };
+    }
+    if (imageHeight && (typeof imageHeight !== 'number' || imageHeight < 1 || imageHeight > 10000)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Image height must be between 1 and 10000' }) };
+    }
+
+    // Validate mimeType
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (mimeType && !allowedMimeTypes.includes(mimeType)) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid image type' }) };
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
     
     if (!apiKey) {
@@ -32,6 +51,11 @@ exports.handler = async (event) => {
     const width = imageWidth || 400;
     const height = imageHeight || 300;
     const mime = mimeType || 'image/png';
+
+    // Sanitize componentName to prevent injection
+    const safeName = componentName
+      ? componentName.replace(/[^a-zA-Z0-9_\- ]/g, '').slice(0, 50)
+      : 'Frame';
 
     const requestBody = JSON.stringify({
       model: 'claude-sonnet-4-20250514',
@@ -47,7 +71,7 @@ Return ONLY JavaScript:
 (async () => {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   const frame = figma.createFrame();
-  frame.name = "${componentName || 'Frame'}";
+  frame.name = "${safeName}";
   frame.resize(${width}, ${height});
   frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
   frame.layoutMode = "VERTICAL";
@@ -110,6 +134,7 @@ Rules:
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, figmaCode: code }) };
 
   } catch (error) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
+    console.error('Netlify Analyze API Error:', error);
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) };
   }
 };

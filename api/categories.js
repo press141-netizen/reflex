@@ -26,7 +26,12 @@ export default async function handler(req, res) {
     return d.result;
   };
 
-  const { boardId = 'public' } = req.query;
+  let { boardId = 'public' } = req.query;
+
+  // Sanitize boardId to prevent NoSQL injection
+  boardId = String(boardId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50);
+  if (!boardId) boardId = 'public';
+
   // public은 기존 main 키 사용 (데이터 호환)
   const BOARD_KEY = boardId === 'public' ? 'reflex:main' : `reflex:${boardId}`;
 
@@ -34,15 +39,26 @@ export default async function handler(req, res) {
     const { customCategories } = req.body;
     if (!customCategories) return res.status(400).json({ error: 'No categories' });
 
+    // Validate customCategories structure
+    if (typeof customCategories !== 'object' || Array.isArray(customCategories)) {
+      return res.status(400).json({ error: 'Invalid categories format' });
+    }
+
+    // Validate size
+    const categoriesSize = JSON.stringify(customCategories).length;
+    if (categoriesSize > 100000) { // 100KB limit
+      return res.status(400).json({ error: 'Categories data too large (max 100KB)' });
+    }
+
     const raw = await redis(['GET', BOARD_KEY]);
     const data = raw ? JSON.parse(raw) : { references: [], customCategories: {} };
-    
+
     data.customCategories = customCategories;
     await redis(['SET', BOARD_KEY, JSON.stringify(data)]);
-    
+
     return res.status(200).json({ success: true });
   } catch (e) {
     console.error('Categories API Error:', e);
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
